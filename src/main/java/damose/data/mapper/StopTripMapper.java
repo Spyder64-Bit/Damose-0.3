@@ -15,7 +15,7 @@ import damose.data.model.Trip;
 
 /**
  * Maps stops to trips and provides trip sequence lookups.
- * Indexes trip variants for matching regardless of feed format.
+ * Memory optimized: uses lazy variant lookup instead of pre-computing all variants.
  */
 public class StopTripMapper {
 
@@ -27,6 +27,7 @@ public class StopTripMapper {
     public StopTripMapper(List<StopTime> stopTimes, TripMatcher matcher) {
         this.matcher = matcher;
 
+        // Build maps without variant explosion
         for (StopTime st : stopTimes) {
             String stopId = st.getStopId();
             String rawTripId = st.getTripId();
@@ -37,19 +38,10 @@ public class StopTripMapper {
 
             stopToTrips.computeIfAbsent(stopId, k -> new ArrayList<>()).add(st);
 
-            // Index mapping for normalized trip id
+            // Only index normalized trip ID (not all variants - too memory intensive)
             tripSeqToStop
                     .computeIfAbsent(normTripId, k -> new HashMap<>())
                     .put(seq, stopId);
-
-            // Index all useful variants
-            Set<String> variants = TripIdUtils.generateVariants(rawTripId);
-            for (String v : variants) {
-                String vNorm = normalizeTripId(v);
-                tripSeqToStop
-                        .computeIfAbsent(vNorm, k -> new HashMap<>())
-                        .put(seq, stopId);
-            }
         }
 
         // Sort stop times by arrival
@@ -80,7 +72,7 @@ public class StopTripMapper {
     public String getStopIdByTripAndSequence(String tripId, int sequence) {
         if (tripId == null) return null;
 
-        // Try direct normalized lookup
+        // Try direct normalized lookup (most common case)
         String norm = normalizeTripId(tripId);
         Map<Integer, String> seqMap = tripSeqToStop.get(norm);
         if (seqMap != null) {
@@ -90,13 +82,13 @@ public class StopTripMapper {
             }
         }
 
-        // Try all variants
-        Set<String> variants = TripIdUtils.generateVariants(tripId);
-        for (String v : variants) {
-            String vNorm = normalizeTripId(v);
-            Map<Integer, String> m = tripSeqToStop.get(vNorm);
-            if (m != null) {
-                String s = m.get(sequence);
+        // Lazy variant lookup only if direct lookup fails
+        // Only try simple variant (without separator changes)
+        String simple = TripIdUtils.normalizeSimple(tripId);
+        if (simple != null && !simple.equals(norm)) {
+            seqMap = tripSeqToStop.get(simple);
+            if (seqMap != null) {
+                String s = seqMap.get(sequence);
                 if (s != null) {
                     return s;
                 }

@@ -346,6 +346,8 @@ public class MainController {
             return;
         }
 
+        // Clear any previously selected single stop
+        MapOverlayManager.clearVisibleStops();
         MapOverlayManager.setRoute(routeStops);
         MapOverlayManager.setBusRouteFilter(routeId); // Only show buses of this route
         refreshMapOverlay();

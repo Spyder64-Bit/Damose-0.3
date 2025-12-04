@@ -14,11 +14,9 @@ import damose.data.model.StopTime;
 
 /**
  * Loader for GTFS stop_times.txt file.
+ * Memory optimized: returns data once, doesn't keep static copies.
  */
 public final class StopTimesLoader {
-
-    private static List<StopTime> allStopTimes = new ArrayList<>();
-    private static Map<String, List<StopTime>> stopTimesByStop = new HashMap<>();
 
     private StopTimesLoader() {
         // Utility class
@@ -29,8 +27,7 @@ public final class StopTimesLoader {
     }
 
     public static List<StopTime> load(String resourcePath) {
-        allStopTimes.clear();
-        stopTimesByStop.clear();
+        List<StopTime> result = new ArrayList<>();
 
         try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(StopTimesLoader.class.getResourceAsStream(resourcePath)))) {
@@ -47,12 +44,12 @@ public final class StopTimesLoader {
                 String[] parts = line.split(",");
                 if (parts.length < 10) continue;
 
-                String tripId = parts[0];
+                String tripId = parts[0].intern(); // Intern strings to save memory
                 LocalTime arrival = parseTime(parts[1]);
                 LocalTime departure = parseTime(parts[2]);
-                String stopId = parts[3];
+                String stopId = parts[3].intern();
                 int stopSequence = parseInt(parts[4]);
-                String stopHeadsign = parts[5];
+                String stopHeadsign = parts[5].isEmpty() ? "" : parts[5].intern();
                 int pickupType = parseInt(parts[6]);
                 int dropOffType = parseInt(parts[7]);
                 double shapeDistTraveled = parseDouble(parts[8]);
@@ -62,26 +59,17 @@ public final class StopTimesLoader {
                         stopSequence, stopHeadsign, pickupType, dropOffType,
                         shapeDistTraveled, timepoint);
 
-                allStopTimes.add(st);
-                stopTimesByStop.computeIfAbsent(stopId, k -> new ArrayList<>()).add(st);
+                result.add(st);
             }
 
-            System.out.println("StopTimes loaded: " + allStopTimes.size());
+            System.out.println("StopTimes loaded: " + result.size());
 
         } catch (IOException e) {
             System.err.println("Error loading stop_times: " + e.getMessage());
             e.printStackTrace();
         }
 
-        return allStopTimes;
-    }
-
-    public static List<StopTime> getAllStopTimes() {
-        return allStopTimes;
-    }
-
-    public static List<StopTime> getStopTimesForStop(String stopId) {
-        return stopTimesByStop.getOrDefault(stopId, new ArrayList<>());
+        return result;
     }
 
     private static LocalTime parseTime(String s) {

@@ -27,8 +27,8 @@ public final class MapFactory {
         TileFactoryInfo info = new OSMTileFactoryInfo("OpenStreetMap", "https://tile.openstreetmap.org");
         DefaultTileFactory tileFactory = new DefaultTileFactory(info);
         
-        // Use more threads for faster tile loading during animations
-        tileFactory.setThreadPoolSize(8);
+        // Reduce thread pool to save memory
+        tileFactory.setThreadPoolSize(4);
 
         File cacheDir = new File(System.getProperty("user.home"), ".jxmapviewer2");
         tileFactory.setLocalCache(new FileBasedLocalCache(cacheDir, false));
