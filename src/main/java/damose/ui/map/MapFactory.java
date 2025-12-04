@@ -15,6 +15,7 @@ import damose.config.AppConstants;
 
 /**
  * Factory for creating and configuring JXMapViewer instances.
+ * Optimized for smooth rendering without glitches.
  */
 public final class MapFactory {
 
@@ -25,6 +26,9 @@ public final class MapFactory {
     public static JXMapViewer createMapViewer() {
         TileFactoryInfo info = new OSMTileFactoryInfo("OpenStreetMap", "https://tile.openstreetmap.org");
         DefaultTileFactory tileFactory = new DefaultTileFactory(info);
+        
+        // Use more threads for faster tile loading during animations
+        tileFactory.setThreadPoolSize(8);
 
         File cacheDir = new File(System.getProperty("user.home"), ".jxmapviewer2");
         tileFactory.setLocalCache(new FileBasedLocalCache(cacheDir, false));
@@ -33,9 +37,11 @@ public final class MapFactory {
         map.setTileFactory(tileFactory);
         map.setAddressLocation(new GeoPosition(AppConstants.ROME_LAT, AppConstants.ROME_LON));
         map.setZoom(AppConstants.DEFAULT_ZOOM);
+        
+        // Enable double buffering to prevent flickering
+        map.setDoubleBuffered(true);
 
-        // Interaction listeners
-        map.addMouseWheelListener(e -> map.repaint());
+        // Interaction listeners - no redundant repaint calls
         PanMouseInputListener pan = new PanMouseInputListener(map);
         map.addMouseListener(pan);
         map.addMouseMotionListener(pan);

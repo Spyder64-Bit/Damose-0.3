@@ -1,6 +1,5 @@
 package damose.service;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -145,15 +144,116 @@ public class ArrivalService {
         }
         return arrivi;
     }
+    
+    /**
+     * Get all trips passing through a stop for the entire day.
+     * @return List of formatted strings with trip info
+     */
+    public List<String> getAllTripsForStopToday(String stopId, ConnectionMode mode, long currentFeedTs) {
+        List<StopTime> times = stopTripMapper.getStopTimesForStop(stopId);
+        if (times == null || times.isEmpty()) {
+            return List.of("Nessun passaggio programmato per oggi");
+        }
+
+        final long nowEpoch = Instant.now().getEpochSecond();
+        final LocalDate feedDate = Instant.ofEpochSecond(currentFeedTs)
+                .atZone(ZoneId.systemDefault()).toLocalDate();
+
+        List<TripArrivalInfo> allTrips = new ArrayList<>();
+
+        for (StopTime st : times) {
+            Trip trip = matcher.matchByTripId(st.getTripId());
+            if (trip == null) continue;
+            
+            String routeId = trip.getRouteId();
+            String tripId = st.getTripId();
+
+            // Check active service
+            String serviceId = trip.getServiceId();
+            if (serviceId != null && !serviceId.isEmpty()) {
+                if (!tripServiceCalendar.serviceRunsOnDate(serviceId, feedDate)) {
+                    continue;
+                }
+            }
+
+            LocalTime arr = st.getArrivalTime();
+            if (arr == null) continue;
+
+            long scheduledEpoch = computeScheduledEpochForFeed(st, currentFeedTs);
+            if (scheduledEpoch <= 0) continue;
+
+            // RT prediction
+            Long predictedEpoch = (mode == ConnectionMode.ONLINE) 
+                ? lookupRealtimeArrivalEpochStrictByStop(st, stopId) 
+                : null;
+
+            allTrips.add(new TripArrivalInfo(routeId, tripId, trip.getTripHeadsign(), 
+                arr, scheduledEpoch, predictedEpoch));
+        }
+
+        // Sort by scheduled time
+        allTrips.sort(Comparator.comparing(t -> t.arrivalTime));
+
+        List<String> result = new ArrayList<>();
+        for (TripArrivalInfo info : allTrips) {
+            result.add(formatTripInfo(info, nowEpoch));
+        }
+
+        if (result.isEmpty()) {
+            result.add("Nessun passaggio programmato per oggi");
+        }
+        return result;
+    }
+    
+    private String formatTripInfo(TripArrivalInfo info, long nowEpoch) {
+        String timeStr = String.format("%02d:%02d", info.arrivalTime.getHour(), info.arrivalTime.getMinute());
+        String headsign = (info.headsign != null && !info.headsign.isEmpty()) ? info.headsign : "";
+        
+        if (info.predictedEpoch != null) {
+            long delayMin = (info.predictedEpoch - info.scheduledEpoch) / 60;
+            String rtStatus;
+            if (delayMin > 1) rtStatus = "+" + delayMin + " min";
+            else if (delayMin < -1) rtStatus = "-" + Math.abs(delayMin) + " min";
+            else rtStatus = "OK";
+            
+            return timeStr + " | " + info.routeId + " " + headsign + " [" + rtStatus + "]";
+        } else {
+            return timeStr + " | " + info.routeId + " " + headsign;
+        }
+    }
+    
+    /**
+     * Info about a single trip arrival.
+     */
+    private static class TripArrivalInfo {
+        final String routeId;
+        final String tripId;
+        final String headsign;
+        final LocalTime arrivalTime;
+        final long scheduledEpoch;
+        final Long predictedEpoch;
+
+        TripArrivalInfo(String routeId, String tripId, String headsign, 
+                       LocalTime arrivalTime, long scheduledEpoch, Long predictedEpoch) {
+            this.routeId = routeId;
+            this.tripId = tripId;
+            this.headsign = headsign;
+            this.arrivalTime = arrivalTime;
+            this.scheduledEpoch = scheduledEpoch;
+            this.predictedEpoch = predictedEpoch;
+        }
+    }
 
     private String formatArrivalInfo(RouteArrivalInfo info) {
         long now = Instant.now().getEpochSecond();
+        
         if (info.predictedEpoch != null) {
+            // RT mode: use predicted epoch
             long diffFromNowMin = Math.max(0, (info.predictedEpoch - now) / 60);
             long delayMin = (info.predictedEpoch - info.scheduledEpoch) / 60;
             String status;
-            if (delayMin > 0) status = "ritardo di " + Math.abs(delayMin) + " min";
-            else if (delayMin < 0) status = "anticipo di " + Math.abs(delayMin) + " min";
+            if (delayMin > 1) status = "ritardo di " + delayMin + " min";
+            else if (delayMin < -1) status = "anticipo di " + Math.abs(delayMin) + " min";
             else status = "in orario";
 
             if (diffFromNowMin <= AppConstants.IN_ARRIVO_THRESHOLD_MIN) {
@@ -162,9 +262,14 @@ public class ArrivalService {
                 return info.routeId + " - " + diffFromNowMin + " min (" + status + ")";
             }
         } else {
-            long diffStaticMin = Math.max(0, 
-                Duration.between(LocalTime.now(), info.stopTime.getArrivalTime()).toMinutes());
-            return info.routeId + " - " + diffStaticMin + " min (statico)";
+            // Static mode: use scheduledEpoch (not LocalTime) for consistency
+            long diffStaticMin = Math.max(0, (info.scheduledEpoch - now) / 60);
+            
+            if (diffStaticMin <= AppConstants.IN_ARRIVO_THRESHOLD_MIN) {
+                return info.routeId + " - In arrivo (statico)";
+            } else {
+                return info.routeId + " - " + diffStaticMin + " min (statico)";
+            }
         }
     }
 

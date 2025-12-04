@@ -7,6 +7,7 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Image;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
@@ -19,6 +20,7 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
+import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
@@ -32,6 +34,7 @@ import javax.swing.event.DocumentListener;
 
 import damose.config.AppConstants;
 import damose.data.model.Stop;
+import damose.service.FavoritesService;
 
 /**
  * Spotlight-style search overlay.
@@ -44,10 +47,13 @@ public class SearchOverlay extends JPanel {
     private final JPanel contentPanel;
     private final JLabel stopsModeBtn;
     private final JLabel linesModeBtn;
+    private final JLabel favoritesModeBtn;
 
-    private boolean stopsMode = true;
+    private enum SearchMode { STOPS, LINES, FAVORITES }
+    private SearchMode currentMode = SearchMode.STOPS;
     private List<Stop> allStops = new ArrayList<>();
     private List<Stop> allLines = new ArrayList<>();
+    private List<Stop> favoriteStops = new ArrayList<>();
     private Consumer<Stop> onSelect;
 
     public SearchOverlay() {
@@ -67,11 +73,12 @@ public class SearchOverlay extends JPanel {
 
         stopsModeBtn = createModeButton("Fermate", true);
         linesModeBtn = createModeButton("Linee", false);
+        favoritesModeBtn = createModeButton("Preferiti", false);
 
         stopsModeBtn.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
-                if (!stopsMode) {
-                    stopsMode = true;
+                if (currentMode != SearchMode.STOPS) {
+                    currentMode = SearchMode.STOPS;
                     updateModeButtons();
                     filterResults();
                 }
@@ -79,8 +86,17 @@ public class SearchOverlay extends JPanel {
         });
         linesModeBtn.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
-                if (stopsMode) {
-                    stopsMode = false;
+                if (currentMode != SearchMode.LINES) {
+                    currentMode = SearchMode.LINES;
+                    updateModeButtons();
+                    filterResults();
+                }
+            }
+        });
+        favoritesModeBtn.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                if (currentMode != SearchMode.FAVORITES) {
+                    currentMode = SearchMode.FAVORITES;
                     updateModeButtons();
                     filterResults();
                 }
@@ -88,8 +104,10 @@ public class SearchOverlay extends JPanel {
         });
 
         modePanel.add(stopsModeBtn);
-        modePanel.add(Box.createHorizontalStrut(8));
+        modePanel.add(Box.createHorizontalStrut(6));
         modePanel.add(linesModeBtn);
+        modePanel.add(Box.createHorizontalStrut(6));
+        modePanel.add(favoritesModeBtn);
 
         searchField = new JTextField();
         searchField.setBackground(AppConstants.BG_FIELD);
@@ -125,7 +143,12 @@ public class SearchOverlay extends JPanel {
                     moveSelection(-1);
                 } else if (code == KeyEvent.VK_TAB) {
                     e.consume();
-                    stopsMode = !stopsMode;
+                    // Cycle through modes: STOPS -> LINES -> FAVORITES -> STOPS
+                    currentMode = switch (currentMode) {
+                        case STOPS -> SearchMode.LINES;
+                        case LINES -> SearchMode.FAVORITES;
+                        case FAVORITES -> SearchMode.STOPS;
+                    };
                     updateModeButtons();
                     filterResults();
                 }
@@ -145,7 +168,7 @@ public class SearchOverlay extends JPanel {
         resultList.setSelectionBackground(AppConstants.ACCENT);
         resultList.setSelectionForeground(Color.WHITE);
         resultList.setFont(AppConstants.FONT_BODY);
-        resultList.setFixedCellHeight(48);
+        resultList.setFixedCellHeight(58); // Increased for better spacing
         resultList.setCellRenderer(new StopCellRenderer());
 
         resultList.addKeyListener(new KeyAdapter() {
@@ -154,6 +177,9 @@ public class SearchOverlay extends JPanel {
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
                     e.consume();
                     selectCurrentAndClose();
+                } else if (e.getKeyCode() == KeyEvent.VK_F) {
+                    e.consume();
+                    toggleSelectedFavorite();
                 }
             }
         });
@@ -177,7 +203,7 @@ public class SearchOverlay extends JPanel {
         listPanel.add(scrollPane, BorderLayout.CENTER);
         contentPanel.add(listPanel, BorderLayout.CENTER);
 
-        JLabel hint = new JLabel("Tab = cambia modo | Enter = seleziona | Esc = chiudi");
+        JLabel hint = new JLabel("Tab = categoria | F = preferito | Enter = seleziona | Esc = chiudi");
         hint.setFont(AppConstants.FONT_HINT);
         hint.setForeground(AppConstants.TEXT_SECONDARY);
         hint.setBorder(new EmptyBorder(10, 0, 0, 0));
@@ -212,28 +238,39 @@ public class SearchOverlay extends JPanel {
     }
 
     private void updateModeButtons() {
-        if (stopsMode) {
-            stopsModeBtn.setBackground(AppConstants.ACCENT);
-            stopsModeBtn.setForeground(Color.WHITE);
-            linesModeBtn.setBackground(AppConstants.BG_FIELD);
-            linesModeBtn.setForeground(AppConstants.TEXT_SECONDARY);
-        } else {
-            stopsModeBtn.setBackground(AppConstants.BG_FIELD);
-            stopsModeBtn.setForeground(AppConstants.TEXT_SECONDARY);
-            linesModeBtn.setBackground(AppConstants.ACCENT);
-            linesModeBtn.setForeground(Color.WHITE);
-        }
+        // Reset all to unselected
+        stopsModeBtn.setBackground(AppConstants.BG_FIELD);
+        stopsModeBtn.setForeground(AppConstants.TEXT_SECONDARY);
+        linesModeBtn.setBackground(AppConstants.BG_FIELD);
+        linesModeBtn.setForeground(AppConstants.TEXT_SECONDARY);
+        favoritesModeBtn.setBackground(AppConstants.BG_FIELD);
+        favoritesModeBtn.setForeground(AppConstants.TEXT_SECONDARY);
+        
+        // Highlight selected
+        JLabel selected = switch (currentMode) {
+            case STOPS -> stopsModeBtn;
+            case LINES -> linesModeBtn;
+            case FAVORITES -> favoritesModeBtn;
+        };
+        selected.setBackground(AppConstants.ACCENT);
+        selected.setForeground(Color.WHITE);
     }
 
     private void filterResults() {
         String query = searchField.getText().toLowerCase().trim();
         listModel.clear();
 
-        List<Stop> source = stopsMode ? allStops : allLines;
+        List<Stop> source = switch (currentMode) {
+            case STOPS -> allStops;
+            case LINES -> allLines;
+            case FAVORITES -> favoriteStops;
+        };
+        
         int count = 0;
+        int limit = (currentMode == SearchMode.FAVORITES) ? 100 : 50;
 
         for (Stop s : source) {
-            if (count >= 50) break;
+            if (count >= limit) break;
             String name = s.getStopName().toLowerCase();
             String id = s.getStopId().toLowerCase();
             if (query.isEmpty() || name.contains(query) || id.contains(query)) {
@@ -266,6 +303,25 @@ public class SearchOverlay extends JPanel {
             }
         }
     }
+    
+    private void toggleSelectedFavorite() {
+        Stop selected = resultList.getSelectedValue();
+        if (selected != null) {
+            if (selected.isFakeLine()) {
+                FavoritesService.toggleLineFavorite(selected.getStopId());
+            } else {
+                FavoritesService.toggleFavorite(selected.getStopId());
+            }
+            // Refresh the list to show updated star
+            resultList.repaint();
+            
+            // If in favorites mode, refresh the list
+            if (currentMode == SearchMode.FAVORITES) {
+                favoriteStops = FavoritesService.getAllFavorites();
+                filterResults();
+            }
+        }
+    }
 
     private void closeOverlay() {
         setVisible(false);
@@ -282,12 +338,12 @@ public class SearchOverlay extends JPanel {
 
     public void showSearch() {
         searchField.setText("");
-        stopsMode = true;
+        currentMode = SearchMode.STOPS;
         updateModeButtons();
         filterResults();
         setVisible(true);
 
-        int panelW = 500;
+        int panelW = 520;
         int panelH = 420;
         int x = (getWidth() - panelW) / 2;
         int y = (getHeight() - panelH) / 3;
@@ -295,12 +351,43 @@ public class SearchOverlay extends JPanel {
 
         SwingUtilities.invokeLater(() -> searchField.requestFocusInWindow());
     }
+    
+    /**
+     * Show favorites tab in the search overlay.
+     */
+    public void showFavorites(List<Stop> favorites) {
+        searchField.setText("");
+        this.favoriteStops = favorites != null ? new ArrayList<>(favorites) : new ArrayList<>();
+        currentMode = SearchMode.FAVORITES;
+        updateModeButtons();
+        filterResults();
+        
+        setVisible(true);
+
+        int panelW = 520;
+        int panelH = 420;
+        int x = (getWidth() - panelW) / 2;
+        int y = (getHeight() - panelH) / 3;
+        contentPanel.setBounds(x, y, panelW, panelH);
+
+        SwingUtilities.invokeLater(() -> searchField.requestFocusInWindow());
+    }
+    
+    /**
+     * Update the favorites list (called when favorites change).
+     */
+    public void updateFavorites(List<Stop> favorites) {
+        this.favoriteStops = new ArrayList<>(favorites);
+        if (currentMode == SearchMode.FAVORITES) {
+            filterResults();
+        }
+    }
 
     @Override
     public void setBounds(int x, int y, int width, int height) {
         super.setBounds(x, y, width, height);
         if (contentPanel != null && isVisible()) {
-            int panelW = 500;
+            int panelW = 520;
             int panelH = 420;
             int px = (width - panelW) / 2;
             int py = (height - panelH) / 3;
@@ -324,26 +411,68 @@ public class SearchOverlay extends JPanel {
     private class StopCellRenderer extends JPanel implements ListCellRenderer<Stop> {
         private final JLabel nameLabel;
         private final JLabel idLabel;
+        private final JLabel starLabel;
+        private ImageIcon yellowStarIcon;
 
         public StopCellRenderer() {
             setLayout(new BorderLayout());
-            setBorder(new EmptyBorder(8, 14, 8, 14));
+            setBorder(new EmptyBorder(10, 14, 10, 14));
+            setOpaque(true);
+            
+            // Create yellow star icon for favorites
+            yellowStarIcon = new ImageIcon(createYellowStar(16));
 
             JPanel textPanel = new JPanel();
             textPanel.setOpaque(false);
             textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
 
             nameLabel = new JLabel();
-            nameLabel.setFont(AppConstants.FONT_BODY);
+            nameLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
 
             idLabel = new JLabel();
-            idLabel.setFont(AppConstants.FONT_HINT);
+            idLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
 
             textPanel.add(nameLabel);
-            textPanel.add(Box.createVerticalStrut(2));
+            textPanel.add(Box.createVerticalStrut(3));
             textPanel.add(idLabel);
 
             add(textPanel, BorderLayout.CENTER);
+            
+            // Star indicator for favorites
+            starLabel = new JLabel();
+            starLabel.setBorder(new EmptyBorder(0, 8, 0, 4));
+            starLabel.setPreferredSize(new Dimension(24, 24));
+            add(starLabel, BorderLayout.EAST);
+        }
+        
+        private Image createYellowStar(int size) {
+            java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
+                size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            java.awt.Graphics2D g2 = img.createGraphics();
+            g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, 
+                               java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+            
+            int[] xPoints = new int[10];
+            int[] yPoints = new int[10];
+            double angleStep = Math.PI / 5;
+            int cx = size / 2;
+            int cy = size / 2;
+            int outerR = size / 2 - 1;
+            int innerR = size / 4;
+
+            for (int i = 0; i < 10; i++) {
+                double angle = -Math.PI / 2 + i * angleStep;
+                int r = (i % 2 == 0) ? outerR : innerR;
+                xPoints[i] = (int) (cx + r * Math.cos(angle));
+                yPoints[i] = (int) (cy + r * Math.sin(angle));
+            }
+            
+            g2.setColor(new Color(255, 200, 50)); // Gold/Yellow fill
+            g2.fillPolygon(xPoints, yPoints, 10);
+            g2.setColor(new Color(200, 150, 0)); // Darker border
+            g2.drawPolygon(xPoints, yPoints, 10);
+            g2.dispose();
+            return img;
         }
 
         @Override
@@ -351,9 +480,21 @@ public class SearchOverlay extends JPanel {
                 Stop value, int index, boolean isSelected, boolean cellHasFocus) {
 
             String name = value.getStopName();
-            if (name.length() > 50) name = name.substring(0, 50) + "...";
+            if (name.length() > 38) name = name.substring(0, 38) + "...";
             nameLabel.setText(name);
-            idLabel.setText(value.isFakeLine() ? "Linea bus" : "Stop ID: " + value.getStopId());
+            
+            // Check favorite status
+            boolean isFavorite;
+            if (value.isFakeLine()) {
+                idLabel.setText("Linea bus");
+                isFavorite = FavoritesService.isLineFavorite(value.getStopId());
+            } else {
+                idLabel.setText("Stop ID: " + value.getStopId());
+                isFavorite = FavoritesService.isFavorite(value.getStopId());
+            }
+            
+            // Show yellow star if favorite
+            starLabel.setIcon(isFavorite ? yellowStarIcon : null);
 
             if (isSelected) {
                 setBackground(AppConstants.ACCENT);

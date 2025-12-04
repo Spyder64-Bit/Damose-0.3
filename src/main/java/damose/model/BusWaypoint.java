@@ -12,12 +12,14 @@ public class BusWaypoint extends DefaultWaypoint {
     private final String tripId;
     private final String tripHeadsign;
     private final String vehicleId;
+    private final String routeId;
 
-    public BusWaypoint(VehiclePosition vp, String tripHeadsign) {
+    public BusWaypoint(VehiclePosition vp, String tripHeadsign, String routeId) {
         super(vp.getPosition());
         this.tripId = vp.getTripId();
         this.vehicleId = vp.getVehicleId();
         this.tripHeadsign = tripHeadsign;
+        this.routeId = routeId;
     }
 
     public String getTripId() {
@@ -31,10 +33,14 @@ public class BusWaypoint extends DefaultWaypoint {
     public String getVehicleId() {
         return vehicleId;
     }
+    
+    public String getRouteId() {
+        return routeId;
+    }
 
     @Override
     public String toString() {
-        return "Bus " + vehicleId + " on line " + tripHeadsign + " (" + tripId + ")";
+        return "Bus " + vehicleId + " on line " + routeId + " - " + tripHeadsign + " (" + tripId + ")";
     }
 }
 

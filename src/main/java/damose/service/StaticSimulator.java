@@ -1,22 +1,13 @@
 package damose.service;
 
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
-import org.jxmapviewer.viewer.GeoPosition;
-
-import damose.data.loader.StopTimesLoader;
-import damose.data.loader.StopsLoader;
-import damose.data.loader.TripsLoader;
-import damose.data.model.Stop;
-import damose.data.model.StopTime;
-import damose.data.model.Trip;
 import damose.data.model.VehiclePosition;
 
 /**
  * Static simulator for offline mode.
- * Generates simulated bus positions based on static GTFS data.
+ * In offline mode, no bus positions are shown (static schedule only).
  */
 public final class StaticSimulator {
 
@@ -25,42 +16,13 @@ public final class StaticSimulator {
     }
 
     /**
-     * Simulate all buses from static GTFS files.
+     * Returns empty list in offline mode - no simulated buses.
+     * Real-time bus positions require online connection.
      */
     public static List<VehiclePosition> simulateAllTrips() {
-        List<VehiclePosition> buses = new ArrayList<>();
-
-        List<Trip> trips = TripsLoader.load();
-        List<StopTime> stopTimes = StopTimesLoader.load();
-        List<Stop> stops = StopsLoader.load();
-
-        for (Trip trip : trips) {
-            String tripId = trip.getTripId();
-
-            List<StopTime> tripStops = stopTimes.stream()
-                    .filter(st -> st.getTripId().equals(tripId))
-                    .sorted((a, b) -> Integer.compare(a.getStopSequence(), b.getStopSequence()))
-                    .collect(Collectors.toList());
-
-            for (StopTime st : tripStops) {
-                Stop stop = stops.stream()
-                        .filter(s -> s.getStopId().equals(st.getStopId()))
-                        .findFirst()
-                        .orElse(null);
-
-                if (stop != null) {
-                    GeoPosition pos = new GeoPosition(stop.getStopLat(), stop.getStopLon());
-                    buses.add(new VehiclePosition(
-                            tripId,
-                            "SIM-" + tripId,
-                            pos,
-                            st.getStopSequence()
-                    ));
-                }
-            }
-        }
-
-        return buses;
+        // Don't simulate buses - it's too heavy and not useful
+        // Offline mode shows static schedule data only
+        return Collections.emptyList();
     }
 }
 

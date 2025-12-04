@@ -250,18 +250,20 @@ public class LoginDialog extends JFrame {
             }
         });
 
-        JButton closeBtn = new JButton("X");
-        closeBtn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        JLabel closeBtn = new JLabel("<html><b style='font-size:14px'>X</b></html>");
         closeBtn.setForeground(AppConstants.TEXT_SECONDARY);
-        closeBtn.setPreferredSize(new Dimension(32, 32));
-        closeBtn.setBorderPainted(false);
-        closeBtn.setContentAreaFilled(false);
-        closeBtn.setFocusPainted(false);
+        closeBtn.setPreferredSize(new Dimension(36, 36));
+        closeBtn.setHorizontalAlignment(JLabel.CENTER);
+        closeBtn.setVerticalAlignment(JLabel.CENTER);
         closeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        closeBtn.addActionListener(e -> closeWithResult(null, true));
         closeBtn.addMouseListener(new MouseAdapter() {
-            public void mouseEntered(MouseEvent e) { closeBtn.setForeground(AppConstants.ERROR_COLOR); }
-            public void mouseExited(MouseEvent e) { closeBtn.setForeground(AppConstants.TEXT_SECONDARY); }
+            public void mouseClicked(MouseEvent e) { closeWithResult(null, true); }
+            public void mouseEntered(MouseEvent e) { 
+                closeBtn.setText("<html><b style='font-size:14px;color:#ff6b6b'>X</b></html>"); 
+            }
+            public void mouseExited(MouseEvent e) { 
+                closeBtn.setText("<html><b style='font-size:14px'>X</b></html>"); 
+            }
         });
 
         titleBar.add(closeBtn, BorderLayout.EAST);

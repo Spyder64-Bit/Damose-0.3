@@ -14,25 +14,34 @@ A real-time bus tracking application for Rome's public transit system, built wit
 
 - **Real-Time Bus Tracking** — Live bus positions on an interactive map using GTFS-RT feeds from Roma Mobilità
 - **Arrival Predictions** — View upcoming arrivals at any stop with real-time delay/early status
-- **Interactive Map** — Pan, zoom, and click on stops to see arrival information
-- **Route Visualization** — Select a bus line to see its complete route highlighted on the map
-- **Stop & Line Search** — Spotlight-style search to find stops by name or search for specific bus lines
+- **Interactive Map** — Pan, zoom, and click on stops to see arrival information with smooth animations
+- **Route Visualization** — Select a bus line to see its complete route highlighted on the map, showing only buses of that line
+- **Stop & Line Search** — Spotlight-style search to find stops by name/ID or search for specific bus lines
+- **Favorites System** — Mark stops and lines as favorites for quick access (star icon)
+- **All Trips View** — View all scheduled trips passing through a stop for the entire day
 - **User Accounts** — Optional login/registration with SQLite database
-- **Offline Mode** — Fallback to static schedule data when real-time feeds are unavailable
-- **Modern Dark UI** — Sleek midnight-dark interface powered by FlatLaf with smooth fade animations
+- **Online/Offline Mode** — Toggle between real-time and static data with connection status indicator
+- **Modern Frameless UI** — Sleek borderless window with custom controls, dark theme powered by FlatLaf
+- **Memory Management** — Built-in garbage collector and memory monitoring
 
 ## 📸 How It Works
 
 1. **Login** — Optional login screen (skip to continue without account)
 2. **Loading** — Animated loading screen shows GTFS data initialization and RT connection status
-3. **Map View** — The main window displays an interactive map of Rome
+3. **Map View** — The main window displays an interactive fullscreen map of Rome
 4. **Bus Icons** — Real-time bus positions are displayed as markers on the map
 5. **Stop Markers** — Click on any bus stop to see upcoming arrivals
 6. **Floating Panel** — Arrivals appear in a tooltip-style panel showing:
    - 🔴 Red dot = Bus is delayed
    - 🟢 Green dot = Bus is on time or early
    - ⚪ Gray dot = Static schedule (no real-time data)
-7. **Search** — Use the search button (🔍) to find stops or lines with Tab to switch modes
+   - ⭐ Star button = Add/remove from favorites
+   - 📋 View all trips of the day
+7. **Search** — Use the search button (🔍) to find stops or lines
+   - **Stops tab** — Search by name or stop ID
+   - **Lines tab** — Search bus routes
+   - **Favorites tab** — Quick access to saved stops/lines
+8. **Connection Toggle** — WiFi button (top-right) to switch between online/offline mode
 
 ## 🛠️ Tech Stack
 
@@ -114,7 +123,9 @@ src/main/java/damose/
 │
 ├── service/                        # Business logic layer
 │   ├── ArrivalService.java         # Arrival time calculations
+│   ├── FavoritesService.java       # User favorites management
 │   ├── GtfsParser.java             # GTFS-RT feed parsing
+│   ├── MemoryManager.java          # Memory monitoring & GC
 │   ├── RealtimeService.java        # RT feed fetching & caching
 │   ├── RouteService.java           # Route/line operations
 │   └── StaticSimulator.java        # Offline mode simulation
@@ -122,6 +133,7 @@ src/main/java/damose/
 └── ui/
     ├── MainView.java               # Main application window
     ├── component/                  # Reusable UI components
+    │   ├── ConnectionButton.java   # Online/Offline toggle
     │   ├── FloatingArrivalPanel.java
     │   └── SearchOverlay.java
     ├── dialog/                     # Modal dialogs
@@ -129,6 +141,7 @@ src/main/java/damose/
     │   └── LoginDialog.java
     ├── map/                        # Map utilities
     │   ├── GeoUtils.java
+    │   ├── MapAnimator.java        # Smooth map transitions
     │   ├── MapFactory.java
     │   └── MapOverlayManager.java
     └── render/                     # Custom waypoint renderers
@@ -143,10 +156,16 @@ src/main/resources/
 │   ├── stop_times.txt
 │   ├── calendar_dates.txt
 │   └── ...
-└── sprites/                        # UI icons
-    ├── bus.png
-    ├── stop.png
-    └── lente.png
+├── sprites/                        # UI icons
+│   ├── bus.png
+│   ├── stop.png
+│   ├── star.png
+│   ├── wifi.png
+│   ├── nowifi.png
+│   ├── connecting.gif
+│   └── lente.png
+└── data/
+    └── favorites.txt               # User favorites storage
 ```
 
 ## 🌐 Data Sources
@@ -173,13 +192,19 @@ All configuration is centralized in `AppConstants.java`:
 
 ## 🎨 UI Theme
 
-The application uses a custom **Midnight Dark** theme with colors defined in `AppConstants.java`:
+The application uses a custom **Midnight Dark** theme with a frameless window design:
 
 - Background: `#111115` (dark)
+- Panel Background: `#1C1C1E` (dark gray)
 - Accent: `#58A6FF` (blue)
 - Success: `#63D263` (green)
 - Error: `#FF6363` (red)
 - Text: `#E5E5EA` (light gray)
+
+### Window Controls
+- Custom minimize, maximize, restore, and close buttons
+- Draggable window from any point on the map
+- Rounded corners (when not maximized)
 
 ## 🔧 Architecture
 
@@ -199,7 +224,7 @@ The codebase follows a clean layered architecture:
 ┌────────────────▼────────────────────────┐
 │           Service Layer                 │
 │  (ArrivalService, RealtimeService,      │
-│   RouteService, GtfsParser)             │
+│   RouteService, FavoritesService)       │
 └────────────────┬────────────────────────┘
                  │
 ┌────────────────▼────────────────────────┐
