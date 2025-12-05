@@ -15,6 +15,7 @@ import org.jxmapviewer.viewer.GeoPosition;
 import com.google.transit.realtime.GtfsRealtime;
 
 import damose.data.loader.CalendarLoader;
+import damose.data.loader.RoutesLoader;
 import damose.data.loader.StopTimesLoader;
 import damose.data.loader.StopsLoader;
 import damose.data.loader.TripsLoader;
@@ -32,6 +33,7 @@ import damose.service.FavoritesService;
 import damose.service.GtfsParser;
 import damose.service.RealtimeService;
 import damose.service.RouteService;
+import damose.service.ServiceQualityTracker;
 import damose.ui.MainView;
 import damose.ui.map.MapAnimator;
 import damose.ui.map.MapOverlayManager;
@@ -63,6 +65,7 @@ public class MainController {
         stops = StopsLoader.load();
         trips = TripsLoader.load();
         stopTimes = StopTimesLoader.load();
+        RoutesLoader.load(); // Load routes for vehicle type detection
 
         System.out.println("Stops loaded: " + (stops == null ? 0 : stops.size()));
         System.out.println("Trips loaded: " + (trips == null ? 0 : trips.size()));
@@ -460,6 +463,9 @@ public class MainController {
                     if (mode == ConnectionMode.ONLINE && vpFeed != null) {
                         computedPositions = GtfsParser.parseVehiclePositions(vpFeed);
                         System.out.println("Buses parsed: " + computedPositions.size());
+                        
+                        // Update service quality metrics
+                        ServiceQualityTracker.getInstance().updateVehicleCount(computedPositions.size());
                     } else {
                         computedPositions = Collections.emptyList();
                         if (vpFeed == null) {

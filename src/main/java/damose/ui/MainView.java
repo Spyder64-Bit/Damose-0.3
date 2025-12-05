@@ -32,6 +32,7 @@ import damose.data.model.Stop;
 import damose.ui.component.ConnectionButton;
 import damose.ui.component.FloatingArrivalPanel;
 import damose.ui.component.SearchOverlay;
+import damose.ui.component.ServiceQualityPanel;
 import damose.ui.map.GeoUtils;
 import damose.ui.map.MapFactory;
 
@@ -53,6 +54,7 @@ public class MainView {
     private JPanel overlayPanel;
     private FloatingArrivalPanel floatingPanel;
     private GeoPosition floatingAnchorGeo;
+    private ServiceQualityPanel serviceQualityPanel;
     private List<Stop> allStopsCache = new ArrayList<>();
     private List<Stop> allLinesCache = new ArrayList<>();
 
@@ -205,6 +207,11 @@ public class MainView {
         connectionButton = new ConnectionButton();
         connectionButton.setBounds(1100 - 59, 48, 44, 44);
         overlayPanel.add(connectionButton);
+        
+        // Service quality panel (bottom-left)
+        serviceQualityPanel = new ServiceQualityPanel();
+        serviceQualityPanel.setBounds(15, 750 - 65, 180, 50);
+        overlayPanel.add(serviceQualityPanel);
 
         layeredPane.addComponentListener(new ComponentAdapter() {
             @Override
@@ -220,6 +227,9 @@ public class MainView {
                 updateWindowControlPositions(w);
                 if (connectionButton != null) {
                     connectionButton.setBounds(w - 59, 48, 44, 44);
+                }
+                if (serviceQualityPanel != null) {
+                    serviceQualityPanel.setBounds(15, h - 65, 180, 50);
                 }
                 updateFloatingPanelPosition();
             }
