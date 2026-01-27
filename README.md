@@ -9,11 +9,13 @@ A real-time bus tracking application for Rome's public transit system, built wit
 <p align="center">
   <img src="src/main/resources/sprites/bus.png" alt="Bus Icon" width="120"/>
 </p>
+
 ![Status](https://img.shields.io/badge/Status-In%20Review-yellow?style=for-the-badge)
 ![ETA](https://img.shields.io/badge/ETA-10%20Febbraio-blue?style=for-the-badge)
 
 > Il progetto è attualmente in fase di revisione.  
 > La release completa è prevista per il **10 Febbraio**.
+
 ## ✨ Features
 
 - **Real-Time Bus Tracking** — Live bus positions on an interactive map using GTFS-RT feeds from Roma Mobilità
