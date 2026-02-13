@@ -11,10 +11,6 @@ import com.google.transit.realtime.GtfsRealtime;
 import damose.config.AppConstants;
 import damose.model.ConnectionMode;
 
-/**
- * Service for fetching and maintaining GTFS-RT feeds.
- * Downloads and keeps the latest valid GTFS-RT snapshots.
- */
 public class RealtimeService {
 
     private static GtfsRealtime.FeedMessage latestVehiclePositions;
@@ -26,7 +22,6 @@ public class RealtimeService {
     private static boolean dataReceivedOnce = false;
 
     private RealtimeService() {
-        // Static utility class
     }
 
     public static void setMode(ConnectionMode newMode) {
@@ -58,7 +53,6 @@ public class RealtimeService {
     }
 
     public static void fetchRealtimeFeeds() {
-        // Vehicle Positions
         try {
             GtfsRealtime.FeedMessage parsed = fetchFeedFromUrl(AppConstants.VEHICLE_POSITIONS_URL);
             if (parsed != null) {
@@ -71,7 +65,6 @@ public class RealtimeService {
             System.out.println("Error fetching VehiclePositions: " + e.getMessage());
         }
 
-        // Trip Updates
         try {
             GtfsRealtime.FeedMessage parsed = fetchFeedFromUrl(AppConstants.TRIP_UPDATES_URL);
             if (parsed != null) {

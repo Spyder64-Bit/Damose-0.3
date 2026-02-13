@@ -38,10 +38,6 @@ import damose.config.AppConstants;
 import damose.database.User;
 import damose.database.UserService;
 
-/**
- * Login and registration frame - Midnight Dark style.
- * Uses JFrame to appear in taskbar for a seamless app experience.
- */
 public class LoginDialog extends JFrame {
 
     private JTextField usernameField;
@@ -65,7 +61,6 @@ public class LoginDialog extends JFrame {
         setBackground(new Color(0, 0, 0, 0));
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         
-        // Set app icon
         try {
             ImageIcon icon = new ImageIcon(getClass().getResource("/sprites/icon.png"));
             List<Image> icons = new ArrayList<>();
@@ -75,7 +70,6 @@ public class LoginDialog extends JFrame {
             System.out.println("Could not load app icon: " + e.getMessage());
         }
         
-        // Handle window close
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
@@ -94,10 +88,6 @@ public class LoginDialog extends JFrame {
         setShape(new RoundRectangle2D.Double(0, 0, 450, 540, 16, 16));
     }
 
-    /**
-     * Set callback to be called when login is complete or cancelled.
-     * @param callback Consumer that receives the User (null if cancelled/skipped)
-     */
     public void setOnComplete(Consumer<User> callback) {
         this.onComplete = callback;
     }
@@ -134,7 +124,6 @@ public class LoginDialog extends JFrame {
         contentPanel.setOpaque(false);
         contentPanel.setBorder(new EmptyBorder(10, 40, 20, 40));
 
-        // Icon + Title row (centered)
         JPanel titleRow = new JPanel();
         titleRow.setOpaque(false);
         titleRow.setLayout(new BoxLayout(titleRow, BoxLayout.X_AXIS));
@@ -149,7 +138,6 @@ public class LoginDialog extends JFrame {
             titleRow.add(iconLabel);
             titleRow.add(Box.createHorizontalStrut(10));
         } catch (Exception e) {
-            // Icon not found
         }
         
         JLabel titleLabel = new JLabel("Damose");
@@ -389,10 +377,9 @@ public class LoginDialog extends JFrame {
         emailLabel.setVisible(!isLoginMode);
         emailField.setVisible(!isLoginMode);
         actionButton.setText(isLoginMode ? "Accedi" : "Registrati");
-        switchModeButton.setText(isLoginMode ? "Non hai un account? Registrati" : "Hai già un account? Accedi");
+        switchModeButton.setText(isLoginMode ? "Non hai un account? Registrati" : "Hai giÃƒÂ  un account? Accedi");
         messageLabel.setText(" ");
 
-        // Adjust dialog size for login vs registration mode
         int newHeight = isLoginMode ? 540 : 680;
         int newWidth = 450;
         setSize(newWidth, newHeight);
@@ -426,7 +413,7 @@ public class LoginDialog extends JFrame {
                 toggleMode();
                 usernameField.setText(username);
             } else {
-                showError("Username già in uso");
+                showError("Username giÃƒÂ  in uso");
             }
         }
     }

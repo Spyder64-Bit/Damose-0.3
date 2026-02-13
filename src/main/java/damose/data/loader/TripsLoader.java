@@ -10,14 +10,9 @@ import java.util.List;
 import damose.config.AppConstants;
 import damose.model.Trip;
 
-/**
- * Loader for GTFS trips.txt file.
- * Tolerant to malformed rows and preserves service_id exactly as in the file.
- */
 public final class TripsLoader {
 
     private TripsLoader() {
-        // Utility class
     }
 
     public static List<Trip> load() {
@@ -37,7 +32,6 @@ public final class TripsLoader {
                 String line = br.readLine();
                 if (line == null) return trips;
 
-                // Check if first line is header
                 boolean headerConsumed = line.toLowerCase().startsWith("route_id") 
                         || line.toLowerCase().startsWith("service_id") 
                         || line.toLowerCase().contains("trip_id");
@@ -64,7 +58,6 @@ public final class TripsLoader {
 
         List<String> fields = CsvParser.parseLine(line);
         
-        // trips.txt: route_id,service_id,trip_id,trip_headsign,trip_short_name,direction_id,block_id,shape_id
         if (fields.size() < 3) return;
 
         try {

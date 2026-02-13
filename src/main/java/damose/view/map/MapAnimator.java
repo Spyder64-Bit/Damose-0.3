@@ -6,38 +6,22 @@ import javax.swing.Timer;
 import org.jxmapviewer.JXMapViewer;
 import org.jxmapviewer.viewer.GeoPosition;
 
-/**
- * Provides smooth animated transitions for JXMapViewer.
- * Supports cinematic fly-to animations with zoom out → pan → zoom in effect.
- */
 public final class MapAnimator {
 
-    private static final int FRAME_INTERVAL_MS = 33; // ~30 FPS (smoother tile loading)
-    private static final int FLY_DURATION_MS = 2000; // Default 2 seconds
-    private static final int ZOOM_OUT_LEVELS = 3; // How many zoom levels to pull back
+    private static final int FRAME_INTERVAL_MS = 33; // Nota in italiano
+    private static final int FLY_DURATION_MS = 2000; // Nota in italiano
+    private static final int ZOOM_OUT_LEVELS = 3; // Nota in italiano
 
     private static Timer activeTimer;
     private static Runnable onCompleteCallback;
 
     private MapAnimator() {
-        // Utility class
     }
 
-    /**
-     * Cinematic fly-to animation: zooms out, pans, then zooms back in.
-     * Creates a smooth "camera flight" effect.
-     *
-     * @param mapViewer  The map viewer to animate
-     * @param targetPos  Target geographic position
-     * @param targetZoom Target zoom level
-     */
     public static void flyTo(JXMapViewer mapViewer, GeoPosition targetPos, int targetZoom) {
         flyTo(mapViewer, targetPos, targetZoom, FLY_DURATION_MS, null);
     }
 
-    /**
-     * Cinematic fly-to with callback on completion.
-     */
     public static void flyTo(JXMapViewer mapViewer, GeoPosition targetPos, int targetZoom, 
                              int durationMs, Runnable onComplete) {
         if (!SwingUtilities.isEventDispatchThread()) {
@@ -51,7 +35,6 @@ public final class MapAnimator {
         int startZoom = mapViewer.getZoom();
         int finalZoom = targetZoom < 0 ? startZoom : targetZoom;
 
-        // Skip animation if already very close
         if (isCloseEnough(startPos, targetPos) && startZoom == finalZoom) {
             mapViewer.setCenterPosition(targetPos);
             mapViewer.setZoom(finalZoom);
@@ -60,15 +43,13 @@ public final class MapAnimator {
             return;
         }
 
-        // Calculate the "pull back" zoom level (higher number = more zoomed out)
         int maxZoom = Math.max(startZoom, finalZoom);
-        int pullBackZoom = Math.min(maxZoom + ZOOM_OUT_LEVELS, 15); // Cap at reasonable level
+        int pullBackZoom = Math.min(maxZoom + ZOOM_OUT_LEVELS, 15); // Nota in italiano
 
-        // Calculate distance to adjust pull-back dynamically
         double distance = haversineDistance(startPos, targetPos);
-        if (distance > 5.0) { // > 5 km, zoom out more
+        if (distance > 5.0) { // Nota in italiano
             pullBackZoom = Math.min(pullBackZoom + 2, 17);
-        } else if (distance < 0.5) { // < 500m, less zoom out
+        } else if (distance < 0.5) { // Nota in italiano
             pullBackZoom = Math.max(pullBackZoom - 1, maxZoom);
         }
 
@@ -77,18 +58,16 @@ public final class MapAnimator {
         onCompleteCallback = onComplete;
 
         activeTimer = new Timer(FRAME_INTERVAL_MS, null);
-        activeTimer.setCoalesce(true); // Prevent event queue flooding
+        activeTimer.setCoalesce(true); // Nota in italiano
         
         activeTimer.addActionListener(e -> {
             long elapsed = System.currentTimeMillis() - startTime;
             double progress = Math.min(1.0, (double) elapsed / durationMs);
 
-            // Three-phase animation using smooth step
             double lat, lon;
             int zoom;
 
             if (progress < 0.35) {
-                // Phase 1: Zoom out (0% - 35%)
                 double phaseProgress = progress / 0.35;
                 double eased = easeOutQuad(phaseProgress);
                 
@@ -99,7 +78,6 @@ public final class MapAnimator {
                 zoom = (int) Math.round(lerp(startZoom, midZoom, eased));
                 
             } else if (progress < 0.65) {
-                // Phase 2: Pan at zoomed-out level (35% - 65%)
                 double phaseProgress = (progress - 0.35) / 0.30;
                 double eased = easeInOutSine(phaseProgress);
                 
@@ -113,7 +91,6 @@ public final class MapAnimator {
                 zoom = midZoom;
                 
             } else {
-                // Phase 3: Zoom in to target (65% - 100%)
                 double phaseProgress = (progress - 0.65) / 0.35;
                 double eased = easeOutCubic(phaseProgress);
                 
@@ -127,7 +104,6 @@ public final class MapAnimator {
                 zoom = (int) Math.round(lerp(midZoom, finalZoom, eased));
             }
 
-            // Apply position and zoom
             mapViewer.setCenterPosition(new GeoPosition(lat, lon));
             if (zoom != mapViewer.getZoom()) {
                 mapViewer.setZoom(zoom);
@@ -142,9 +118,6 @@ public final class MapAnimator {
         activeTimer.start();
     }
 
-    /**
-     * Simple pan animation without zoom changes (for short distances).
-     */
     public static void panTo(JXMapViewer mapViewer, GeoPosition targetPos, int durationMs) {
         if (!SwingUtilities.isEventDispatchThread()) {
             SwingUtilities.invokeLater(() -> panTo(mapViewer, targetPos, durationMs));
@@ -185,23 +158,14 @@ public final class MapAnimator {
         activeTimer.start();
     }
 
-    /**
-     * Legacy method - now uses flyTo for better effect.
-     */
     public static void animateTo(JXMapViewer mapViewer, GeoPosition targetPos, int targetZoom) {
         flyTo(mapViewer, targetPos, targetZoom);
     }
 
-    /**
-     * Legacy method with duration.
-     */
     public static void animateTo(JXMapViewer mapViewer, GeoPosition targetPos, int targetZoom, int durationMs) {
         flyTo(mapViewer, targetPos, targetZoom, durationMs, null);
     }
 
-    /**
-     * Stop any running animation immediately.
-     */
     public static void stopAnimation() {
         if (activeTimer != null) {
             activeTimer.stop();
@@ -210,9 +174,6 @@ public final class MapAnimator {
         onCompleteCallback = null;
     }
 
-    /**
-     * Check if an animation is currently running.
-     */
     public static boolean isAnimating() {
         return activeTimer != null && activeTimer.isRunning();
     }
@@ -232,7 +193,6 @@ public final class MapAnimator {
         }
     }
 
-    // --- Easing Functions ---
 
     private static double easeOutCubic(double t) {
         return 1 - Math.pow(1 - t, 3);
@@ -256,11 +216,8 @@ public final class MapAnimator {
             && Math.abs(a.getLongitude() - b.getLongitude()) < threshold;
     }
 
-    /**
-     * Calculate distance between two points in kilometers.
-     */
     private static double haversineDistance(GeoPosition a, GeoPosition b) {
-        double R = 6371; // Earth radius in km
+        double R = 6371; // Nota in italiano
         double dLat = Math.toRadians(b.getLatitude() - a.getLatitude());
         double dLon = Math.toRadians(b.getLongitude() - a.getLongitude());
         double lat1 = Math.toRadians(a.getLatitude());

@@ -9,9 +9,6 @@ import java.time.LocalTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Unit tests for StopTime model.
- */
 @DisplayName("StopTime")
 class StopTimeTest {
 

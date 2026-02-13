@@ -1,23 +1,25 @@
 package damose.model;
 
-/**
- * Represents a trip update record from GTFS-RT data.
- * Contains arrival time prediction for a specific stop.
- */
 public class TripUpdateRecord {
 
     private final String tripId;
+    private final String routeId;
     private final String stopId;
     private final long arrivalEpochSeconds;
 
-    public TripUpdateRecord(String tripId, String stopId, long arrivalEpochSeconds) {
+    public TripUpdateRecord(String tripId, String routeId, String stopId, long arrivalEpochSeconds) {
         this.tripId = tripId;
+        this.routeId = routeId;
         this.stopId = stopId;
         this.arrivalEpochSeconds = arrivalEpochSeconds;
     }
 
     public String getTripId() {
         return tripId;
+    }
+
+    public String getRouteId() {
+        return routeId;
     }
 
     public String getStopId() {
@@ -30,6 +32,7 @@ public class TripUpdateRecord {
 
     @Override
     public String toString() {
-        return "TripUpdate{tripId='" + tripId + "', stopId='" + stopId + "', arrival=" + arrivalEpochSeconds + "}";
+        return "TripUpdate{tripId='" + tripId + "', routeId='" + routeId
+                + "', stopId='" + stopId + "', arrival=" + arrivalEpochSeconds + "}";
     }
 }

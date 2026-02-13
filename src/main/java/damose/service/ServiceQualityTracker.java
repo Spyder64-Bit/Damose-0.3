@@ -7,26 +7,19 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Tracks service quality metrics for the transit network.
- * Usa livelli di stato con colore (niente immagini), adatti al rendering dei "pallini" in UI.
- */
 public class ServiceQualityTracker {
 
     private static final ServiceQualityTracker INSTANCE = new ServiceQualityTracker();
 
-    // Metrics
     private final AtomicInteger activeVehicles = new AtomicInteger(0);
     private final AtomicInteger totalUpdatesToday = new AtomicInteger(0);
     private final AtomicLong lastUpdateTimestamp = new AtomicLong(0);
 
-    // Delay tracking
     private final ConcurrentHashMap<String, Long> tripDelays = new ConcurrentHashMap<>();
     private final AtomicInteger onTimeCount = new AtomicInteger(0);
     private final AtomicInteger delayedCount = new AtomicInteger(0);
     private final AtomicInteger earlyCount = new AtomicInteger(0);
 
-    // Historical data (last 10 measurements)
     private final List<Integer> vehicleHistory = new ArrayList<>();
     private final List<Double> delayHistory = new ArrayList<>();
     private static final int MAX_HISTORY = 10;
@@ -50,17 +43,12 @@ public class ServiceQualityTracker {
         }
     }
 
-    /**
-     * Record a trip's delay.
-     * @param tripId Trip identifier
-     * @param delaySeconds Delay in seconds (positive = late, negative = early)
-     */
     public void recordTripDelay(String tripId, long delaySeconds) {
         tripDelays.put(tripId, delaySeconds);
 
-        if (delaySeconds > 300) {             // > 5 min late
+        if (delaySeconds > 300) { // Nota in italiano
             delayedCount.incrementAndGet();
-        } else if (delaySeconds < -120) {     // > 2 min early
+        } else if (delaySeconds < -120) { // Nota in italiano
             earlyCount.incrementAndGet();
         } else {
             onTimeCount.incrementAndGet();
@@ -122,10 +110,6 @@ public class ServiceQualityTracker {
         }
     }
 
-    /**
-     * Service status levels con nome, descrizione e colore.
-     * Colori pensati per "pallini": green, yellow, red, orange, grey.
-     */
     public enum ServiceStatus {
         GOOD("Green dot", "Servizio regolare", new java.awt.Color(76, 175, 80)),
         MODERATE("Yellow dot", "Lievi ritardi", new java.awt.Color(255, 193, 7)),

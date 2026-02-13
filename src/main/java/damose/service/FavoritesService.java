@@ -13,10 +13,6 @@ import java.util.Set;
 import damose.model.Stop;
 import damose.database.SessionManager;
 
-/**
- * Service for managing favorite stops and bus lines per user.
- * Favorites are stored in files in the user's home directory.
- */
 public final class FavoritesService {
 
     private static final Set<String> favoriteStopIds = new HashSet<>();
@@ -26,19 +22,12 @@ public final class FavoritesService {
     private static Runnable onFavoritesChanged;
 
     private FavoritesService() {
-        // Utility class
     }
 
-    /**
-     * Initialize the service with stops only.
-     */
     public static void init(List<Stop> allStops) {
         init(allStops, new ArrayList<>());
     }
     
-    /**
-     * Initialize the service with the full list of stops and lines.
-     */
     public static void init(List<Stop> allStops, List<Stop> allLines) {
         allStopsCache = new ArrayList<>(allStops);
         allLinesCache = new ArrayList<>(allLines);
@@ -46,24 +35,14 @@ public final class FavoritesService {
         loadLineFavorites();
     }
 
-    /**
-     * Set callback for when favorites change.
-     */
     public static void setOnFavoritesChanged(Runnable callback) {
         onFavoritesChanged = callback;
     }
 
-    /**
-     * Check if a stop is a favorite.
-     */
     public static boolean isFavorite(String stopId) {
         return favoriteStopIds.contains(stopId);
     }
 
-    /**
-     * Toggle favorite status of a stop.
-     * @return true if now favorite, false if removed
-     */
     public static boolean toggleFavorite(String stopId) {
         boolean result;
         if (favoriteStopIds.contains(stopId)) {
@@ -80,9 +59,6 @@ public final class FavoritesService {
         return result;
     }
 
-    /**
-     * Add a stop to favorites.
-     */
     public static void addFavorite(String stopId) {
         if (!favoriteStopIds.contains(stopId)) {
             favoriteStopIds.add(stopId);
@@ -93,9 +69,6 @@ public final class FavoritesService {
         }
     }
 
-    /**
-     * Remove a stop from favorites.
-     */
     public static void removeFavorite(String stopId) {
         if (favoriteStopIds.remove(stopId)) {
             saveFavorites();
@@ -105,9 +78,6 @@ public final class FavoritesService {
         }
     }
 
-    /**
-     * Get all favorite stops.
-     */
     public static List<Stop> getFavoriteStops() {
         List<Stop> favorites = new ArrayList<>();
         for (Stop stop : allStopsCache) {
@@ -118,9 +88,6 @@ public final class FavoritesService {
         return favorites;
     }
     
-    /**
-     * Get all favorite lines.
-     */
     public static List<Stop> getFavoriteLines() {
         List<Stop> favorites = new ArrayList<>();
         for (Stop line : allLinesCache) {
@@ -131,9 +98,6 @@ public final class FavoritesService {
         return favorites;
     }
     
-    /**
-     * Get all favorites (stops + lines).
-     */
     public static List<Stop> getAllFavorites() {
         List<Stop> all = new ArrayList<>();
         all.addAll(getFavoriteStops());
@@ -141,26 +105,15 @@ public final class FavoritesService {
         return all;
     }
 
-    /**
-     * Get count of favorites.
-     */
     public static int getFavoritesCount() {
         return favoriteStopIds.size() + favoriteLineIds.size();
     }
     
-    // ===== LINE FAVORITES =====
     
-    /**
-     * Check if a line is a favorite.
-     */
     public static boolean isLineFavorite(String lineId) {
         return favoriteLineIds.contains(lineId);
     }
     
-    /**
-     * Toggle favorite status of a line.
-     * @return true if now favorite, false if removed
-     */
     public static boolean toggleLineFavorite(String lineId) {
         boolean result;
         if (favoriteLineIds.contains(lineId)) {
@@ -177,9 +130,6 @@ public final class FavoritesService {
         return result;
     }
     
-    /**
-     * Add a line to favorites.
-     */
     public static void addLineFavorite(String lineId) {
         if (!favoriteLineIds.contains(lineId)) {
             favoriteLineIds.add(lineId);
@@ -190,9 +140,6 @@ public final class FavoritesService {
         }
     }
     
-    /**
-     * Remove a line from favorites.
-     */
     public static void removeLineFavorite(String lineId) {
         if (favoriteLineIds.remove(lineId)) {
             saveLineFavorites();
@@ -252,7 +199,6 @@ public final class FavoritesService {
         }
     }
     
-    // ===== LINE FAVORITES PERSISTENCE =====
     
     private static File getLineFavoritesFile() {
         String username = "default";

@@ -10,18 +10,11 @@ import java.time.format.DateTimeFormatter;
 import damose.config.AppConstants;
 import damose.model.TripServiceCalendar;
 
-/**
- * Loader for GTFS calendar_dates.txt file.
- * Format: service_id,date,exception_type
- * - exception_type 1 => add service
- * - exception_type 2 => remove service
- */
 public final class CalendarLoader {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private CalendarLoader() {
-        // Utility class
     }
 
     public static TripServiceCalendar load() {
@@ -38,7 +31,7 @@ public final class CalendarLoader {
             }
 
             try (BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-                br.readLine(); // Skip header
+                br.readLine(); // Nota in italiano
 
                 String line;
                 int lineNo = 1;

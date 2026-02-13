@@ -6,9 +6,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Maintains the active dates for each service_id from GTFS calendar data.
- */
 public class TripServiceCalendar {
 
     private final Map<String, Set<LocalDate>> serviceDates = new HashMap<>();

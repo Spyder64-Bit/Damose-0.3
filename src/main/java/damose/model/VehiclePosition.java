@@ -2,9 +2,6 @@ package damose.model;
 
 import org.jxmapviewer.viewer.GeoPosition;
 
-/**
- * Represents a real-time vehicle position from GTFS-RT data.
- */
 public class VehiclePosition {
 
     private final String tripId;

@@ -2,24 +2,19 @@ package damose.data.loader;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import damose.config.AppConstants;
 import damose.model.StopTime;
 
-/**
- * Loader for GTFS stop_times.txt file.
- * Memory optimized: returns data once, doesn't keep static copies.
- */
 public final class StopTimesLoader {
 
     private StopTimesLoader() {
-        // Utility class
     }
 
     public static List<StopTime> load() {
@@ -29,41 +24,46 @@ public final class StopTimesLoader {
     public static List<StopTime> load(String resourcePath) {
         List<StopTime> result = new ArrayList<>();
 
-        try (BufferedReader br = new BufferedReader(
-                new InputStreamReader(StopTimesLoader.class.getResourceAsStream(resourcePath)))) {
-
-            String line;
-            boolean firstLine = true;
-
-            while ((line = br.readLine()) != null) {
-                if (firstLine) {
-                    firstLine = false;
-                    continue;
-                }
-
-                String[] parts = line.split(",");
-                if (parts.length < 10) continue;
-
-                String tripId = parts[0].intern(); // Intern strings to save memory
-                LocalTime arrival = parseTime(parts[1]);
-                LocalTime departure = parseTime(parts[2]);
-                String stopId = parts[3].intern();
-                int stopSequence = parseInt(parts[4]);
-                String stopHeadsign = parts[5].isEmpty() ? "" : parts[5].intern();
-                int pickupType = parseInt(parts[6]);
-                int dropOffType = parseInt(parts[7]);
-                double shapeDistTraveled = parseDouble(parts[8]);
-                int timepoint = parseInt(parts[9]);
-
-                StopTime st = new StopTime(tripId, arrival, departure, stopId,
-                        stopSequence, stopHeadsign, pickupType, dropOffType,
-                        shapeDistTraveled, timepoint);
-
-                result.add(st);
+        try (InputStream in = StopTimesLoader.class.getResourceAsStream(resourcePath)) {
+            if (in == null) {
+                System.err.println("StopTimesLoader: resource not found: " + resourcePath);
+                return result;
             }
 
-            System.out.println("StopTimes loaded: " + result.size());
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                String line;
+                boolean firstLine = true;
 
+                while ((line = br.readLine()) != null) {
+                    if (firstLine) {
+                        firstLine = false;
+                        continue;
+                    }
+
+                    List<String> parts = parseCsvLineFast(line);
+                    if (parts.size() < 5) continue;
+
+                    String tripId = safeGet(parts, 0).trim().intern(); // Nota in italiano
+                    LocalTime arrival = parseTime(safeGet(parts, 1).trim());
+                    LocalTime departure = parseTime(safeGet(parts, 2).trim());
+                    String stopId = safeGet(parts, 3).trim().intern();
+                    int stopSequence = parseInt(safeGet(parts, 4).trim());
+                    String stopHeadsign = safeGet(parts, 5).trim();
+                    if (!stopHeadsign.isEmpty()) stopHeadsign = stopHeadsign.intern();
+                    int pickupType = parseInt(safeGet(parts, 6).trim());
+                    int dropOffType = parseInt(safeGet(parts, 7).trim());
+                    double shapeDistTraveled = parseDouble(safeGet(parts, 8).trim());
+                    int timepoint = parseInt(safeGet(parts, 9).trim());
+
+                    StopTime st = new StopTime(tripId, arrival, departure, stopId,
+                            stopSequence, stopHeadsign, pickupType, dropOffType,
+                            shapeDistTraveled, timepoint);
+
+                    result.add(st);
+                }
+
+                System.out.println("StopTimes loaded: " + result.size());
+            }
         } catch (IOException e) {
             System.err.println("Error loading stop_times: " + e.getMessage());
             e.printStackTrace();
@@ -81,7 +81,6 @@ public final class StopTimesLoader {
             int m = Integer.parseInt(parts[1]);
             int sec = Integer.parseInt(parts[2]);
 
-            // GTFS allows hours > 24, normalize
             h = h % 24;
 
             return LocalTime.of(h, m, sec);
@@ -104,6 +103,29 @@ public final class StopTimesLoader {
         } catch (Exception e) {
             return 0.0;
         }
+    }
+
+    private static String safeGet(List<String> fields, int idx) {
+        return idx < fields.size() ? fields.get(idx) : "";
+    }
+
+    private static List<String> parseCsvLineFast(String line) {
+        if (line == null) return List.of();
+
+        if (line.indexOf('"') < 0) {
+            List<String> out = new ArrayList<>(12);
+            int start = 0;
+            for (int i = 0; i < line.length(); i++) {
+                if (line.charAt(i) == ',') {
+                    out.add(line.substring(start, i));
+                    start = i + 1;
+                }
+            }
+            out.add(line.substring(start));
+            return out;
+        }
+
+        return CsvParser.parseLine(line);
     }
 }
 

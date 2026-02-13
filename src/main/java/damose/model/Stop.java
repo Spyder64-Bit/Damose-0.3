@@ -1,8 +1,5 @@
 package damose.model;
 
-/**
- * Represents a bus stop from GTFS static data.
- */
 public class Stop {
 
     private final String stopId;
@@ -11,7 +8,6 @@ public class Stop {
     private final double stopLat;
     private final double stopLon;
 
-    // Flag to distinguish real stops from fake line entries (used in search)
     private boolean isFakeLine = false;
 
     public Stop(String stopId, String stopCode, String stopName, double stopLat, double stopLon) {
@@ -22,7 +18,6 @@ public class Stop {
         this.stopLon = stopLon;
     }
 
-    // -------- Getters --------
     public String getStopId() {
         return stopId;
     }
@@ -43,7 +38,6 @@ public class Stop {
         return stopLon;
     }
 
-    // -------- Fake Line Support --------
     public void markAsFakeLine() {
         this.isFakeLine = true;
     }

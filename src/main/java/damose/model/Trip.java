@@ -1,8 +1,5 @@
 package damose.model;
 
-/**
- * Represents a trip from GTFS static data.
- */
 public class Trip {
 
     private final String routeId;
@@ -24,7 +21,6 @@ public class Trip {
         this.shapeId = shapeId;
     }
 
-    // -------- Getters --------
     public String getRouteId() {
         return routeId;
     }

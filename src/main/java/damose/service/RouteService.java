@@ -11,10 +11,6 @@ import damose.model.Stop;
 import damose.model.StopTime;
 import damose.model.Trip;
 
-/**
- * Service for managing route-related operations.
- * Provides ordered stop sequences for bus lines.
- */
 public class RouteService {
 
     private final List<Trip> trips;
@@ -28,9 +24,6 @@ public class RouteService {
                 .collect(Collectors.toMap(Stop::getStopId, s -> s, (a, b) -> a));
     }
 
-    /**
-     * Find a representative trip for a line (routeId + headsign).
-     */
     public Trip findRepresentativeTrip(String routeId, String headsign) {
         return trips.stream()
                 .filter(t -> t.getRouteId().equalsIgnoreCase(routeId))
@@ -39,18 +32,12 @@ public class RouteService {
                 .orElse(null);
     }
 
-    /**
-     * Find all trips for a routeId.
-     */
     public List<Trip> findTripsByRouteId(String routeId) {
         return trips.stream()
                 .filter(t -> t.getRouteId().equalsIgnoreCase(routeId))
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Get ordered list of stops for a specific trip.
-     */
     public List<Stop> getStopsForTrip(String tripId) {
         if (tripId == null) return Collections.emptyList();
 
@@ -70,10 +57,6 @@ public class RouteService {
         return orderedStops;
     }
 
-    /**
-     * Get ordered list of stops for a route.
-     * Uses the trip with most stops as representative.
-     */
     public List<Stop> getStopsForRoute(String routeId) {
         if (routeId == null) return Collections.emptyList();
 
@@ -97,18 +80,12 @@ public class RouteService {
         return getStopsForTrip(bestTripId);
     }
 
-    /**
-     * Get ordered list of stops for a route with specific direction.
-     */
     public List<Stop> getStopsForRouteAndHeadsign(String routeId, String headsign) {
         Trip trip = findRepresentativeTrip(routeId, headsign);
         if (trip == null) return Collections.emptyList();
         return getStopsForTrip(trip.getTripId());
     }
 
-    /**
-     * Get all headsigns for a route.
-     */
     public List<String> getHeadsignsForRoute(String routeId) {
         return trips.stream()
                 .filter(t -> t.getRouteId().equalsIgnoreCase(routeId))

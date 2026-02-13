@@ -7,8 +7,10 @@ import java.awt.RenderingHints;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.swing.ImageIcon;
@@ -17,16 +19,13 @@ import javax.swing.SwingUtilities;
 import org.jxmapviewer.JXMapViewer;
 import org.jxmapviewer.viewer.GeoPosition;
 
+import damose.data.mapper.TripIdUtils;
 import damose.model.Stop;
 import damose.model.Trip;
 import damose.model.VehiclePosition;
 import damose.model.BusWaypoint;
 import damose.view.render.RoutePainter;
 
-/**
- * Manages map overlays including stops, buses, and routes.
- * All elements are drawn directly for reliability.
- */
 public class MapOverlayManager {
 
     private static final RoutePainter routePainter = new RoutePainter();
@@ -37,25 +36,25 @@ public class MapOverlayManager {
     private static final List<Stop> routeStops = new ArrayList<>();
     private static final List<Stop> visibleStops = new ArrayList<>();
     private static final List<BusWaypoint> busWaypoints = new ArrayList<>();
+
+    private static final Map<String, Trip> tripByExactId = new HashMap<>();
+    private static final Map<String, Trip> tripByNormalizedId = new HashMap<>();
+    private static List<Trip> indexedTripsRef = null;
     
-    // Filter buses by route ID (null = show all)
     private static String busRouteFilter = null;
     
-    // Global bus visibility (true = show, false = hide unless route filter is set)
     private static boolean busesVisible = true;
 
     private static final Object lock = new Object();
     private static boolean initialized = false;
     private static JXMapViewer currentMap = null;
     
-    // Icons
     private static Image busIcon;
     private static Image busIconSmall;
     private static Image stopIcon;
     private static Image stopIconSmall;
 
     private MapOverlayManager() {
-        // Utility class
     }
     
     private static void loadIcons() {
@@ -86,15 +85,12 @@ public class MapOverlayManager {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             
             synchronized (lock) {
-                // Draw route line first (below stops)
                 if (routePainter.hasRoute()) {
                     routePainter.paint(g2, map, w, h);
                 }
                 
-                // Draw stops
                 drawStops(g2, map);
                 
-                // Draw buses on top
                 drawBuses(g2, map);
             }
         });
@@ -124,7 +120,6 @@ public class MapOverlayManager {
             int screenX = (int) (worldPt.getX() - viewport.getX());
             int screenY = (int) (worldPt.getY() - viewport.getY());
             
-            // Skip if outside visible area
             if (screenX < -size || screenX > map.getWidth() + size ||
                 screenY < -size || screenY > map.getHeight() + size) {
                 continue;
@@ -133,7 +128,6 @@ public class MapOverlayManager {
             if (icon != null) {
                 g.drawImage(icon, screenX - size / 2, screenY - size / 2, null);
             } else {
-                // Fallback: red circle
                 g.setColor(new Color(220, 50, 50));
                 g.fillOval(screenX - size / 2, screenY - size / 2, size, size);
                 g.setColor(Color.WHITE);
@@ -145,7 +139,6 @@ public class MapOverlayManager {
     private static void drawBuses(Graphics2D g, JXMapViewer map) {
         if (busWaypoints.isEmpty()) return;
         
-        // Don't draw if buses are hidden (unless a route filter is active)
         if (!busesVisible && busRouteFilter == null) return;
         
         Rectangle2D viewport = map.getViewportBounds();
@@ -157,7 +150,6 @@ public class MapOverlayManager {
         for (BusWaypoint wp : busWaypoints) {
             if (wp == null || wp.getPosition() == null) continue;
             
-            // Filter by route if set
             if (busRouteFilter != null && wp.getRouteId() != null) {
                 if (!wp.getRouteId().equals(busRouteFilter)) {
                     continue;
@@ -168,7 +160,6 @@ public class MapOverlayManager {
             int screenX = (int) (worldPt.getX() - viewport.getX());
             int screenY = (int) (worldPt.getY() - viewport.getY());
             
-            // Skip if outside visible area
             if (screenX < -size || screenX > map.getWidth() + size ||
                 screenY < -size || screenY > map.getHeight() + size) {
                 continue;
@@ -177,7 +168,6 @@ public class MapOverlayManager {
             if (icon != null) {
                 g.drawImage(icon, screenX - size / 2, screenY - size / 2, null);
             } else {
-                // Fallback: blue circle
                 g.setColor(new Color(0, 120, 255));
                 g.fillOval(screenX - size / 2, screenY - size / 2, size, size);
                 g.setColor(Color.WHITE);
@@ -186,10 +176,6 @@ public class MapOverlayManager {
         }
     }
     
-    /**
-     * Set route filter for buses. Only buses of this route will be shown.
-     * @param routeId Route ID to filter by, or null to show all buses
-     */
     public static void setBusRouteFilter(String routeId) {
         synchronized (lock) {
             busRouteFilter = routeId;
@@ -199,17 +185,10 @@ public class MapOverlayManager {
         }
     }
     
-    /**
-     * Clear bus route filter to show all buses.
-     */
     public static void clearBusRouteFilter() {
         setBusRouteFilter(null);
     }
     
-    /**
-     * Set global bus visibility.
-     * @param visible true to show buses, false to hide (unless a route filter is active)
-     */
     public static void setBusesVisible(boolean visible) {
         synchronized (lock) {
             busesVisible = visible;
@@ -219,10 +198,6 @@ public class MapOverlayManager {
         }
     }
     
-    /**
-     * Toggle global bus visibility.
-     * @return new visibility state
-     */
     public static boolean toggleBusesVisible() {
         synchronized (lock) {
             busesVisible = !busesVisible;
@@ -233,9 +208,6 @@ public class MapOverlayManager {
         return busesVisible;
     }
     
-    /**
-     * Check if buses are currently visible.
-     */
     public static boolean areBusesVisible() {
         return busesVisible;
     }
@@ -254,7 +226,6 @@ public class MapOverlayManager {
         boolean needsRepaint = false;
 
         synchronized (lock) {
-            // Check if stops changed
             Set<String> showIds = new HashSet<>();
             for (Stop s : visibleStops) showIds.add(s.getStopId());
             for (Stop s : routeStops) showIds.add(s.getStopId());
@@ -264,12 +235,12 @@ public class MapOverlayManager {
                 needsRepaint = true;
             }
 
-            // Update bus waypoints
+            ensureTripIndex(trips);
             List<BusWaypoint> newBusWaypoints = new ArrayList<>();
             Set<String> newBusIds = new HashSet<>();
             
             for (VehiclePosition vp : busPositions) {
-                Trip trip = findTrip(trips, vp.getTripId());
+                Trip trip = findTrip(vp.getTripId());
                 String headsign = (trip != null) ? trip.getTripHeadsign() : vp.getTripId();
                 String routeId = (trip != null) ? trip.getRouteId() : null;
                 newBusWaypoints.add(new BusWaypoint(vp, headsign, routeId));
@@ -291,10 +262,45 @@ public class MapOverlayManager {
         }
     }
 
-    private static Trip findTrip(List<Trip> trips, String tripId) {
-        if (tripId == null || trips == null) return null;
-        for (Trip t : trips) {
-            if (t.getTripId().equals(tripId)) return t;
+    private static void ensureTripIndex(List<Trip> trips) {
+        if (trips == null) {
+            return;
+        }
+        if (indexedTripsRef == trips && !tripByExactId.isEmpty()) {
+            return;
+        }
+
+        tripByExactId.clear();
+        tripByNormalizedId.clear();
+        indexedTripsRef = trips;
+
+        for (Trip trip : trips) {
+            if (trip == null) continue;
+            String staticTripId = trip.getTripId();
+            if (staticTripId == null || staticTripId.isBlank()) continue;
+
+            tripByExactId.putIfAbsent(staticTripId, trip);
+            String normalized = TripIdUtils.normalizeSimple(staticTripId);
+            if (normalized != null && !normalized.isBlank()) {
+                tripByNormalizedId.putIfAbsent(normalized, trip);
+            }
+        }
+    }
+
+    private static Trip findTrip(String tripId) {
+        if (tripId == null || tripId.isBlank()) return null;
+
+        Trip exact = tripByExactId.get(tripId);
+        if (exact != null) {
+            return exact;
+        }
+
+        Set<String> rtVariants = TripIdUtils.generateVariants(tripId);
+        for (String variant : rtVariants) {
+            Trip normalized = tripByNormalizedId.get(variant);
+            if (normalized != null) {
+                return normalized;
+            }
         }
         return null;
     }

@@ -36,9 +36,6 @@ import damose.config.AppConstants;
 import damose.model.Stop;
 import damose.service.FavoritesService;
 
-/**
- * Spotlight-style search overlay.
- */
 public class SearchOverlay extends JPanel {
 
     private final JTextField searchField;
@@ -143,7 +140,6 @@ public class SearchOverlay extends JPanel {
                     moveSelection(-1);
                 } else if (code == KeyEvent.VK_TAB) {
                     e.consume();
-                    // Cycle through modes: STOPS -> LINES -> FAVORITES -> STOPS
                     currentMode = switch (currentMode) {
                         case STOPS -> SearchMode.LINES;
                         case LINES -> SearchMode.FAVORITES;
@@ -168,7 +164,7 @@ public class SearchOverlay extends JPanel {
         resultList.setSelectionBackground(AppConstants.ACCENT);
         resultList.setSelectionForeground(Color.WHITE);
         resultList.setFont(AppConstants.FONT_BODY);
-        resultList.setFixedCellHeight(58); // Increased for better spacing
+        resultList.setFixedCellHeight(58); // Nota in italiano
         resultList.setCellRenderer(new StopCellRenderer());
 
         resultList.addKeyListener(new KeyAdapter() {
@@ -238,7 +234,6 @@ public class SearchOverlay extends JPanel {
     }
 
     private void updateModeButtons() {
-        // Reset all to unselected
         stopsModeBtn.setBackground(AppConstants.BG_FIELD);
         stopsModeBtn.setForeground(AppConstants.TEXT_SECONDARY);
         linesModeBtn.setBackground(AppConstants.BG_FIELD);
@@ -246,7 +241,6 @@ public class SearchOverlay extends JPanel {
         favoritesModeBtn.setBackground(AppConstants.BG_FIELD);
         favoritesModeBtn.setForeground(AppConstants.TEXT_SECONDARY);
         
-        // Highlight selected
         JLabel selected = switch (currentMode) {
             case STOPS -> stopsModeBtn;
             case LINES -> linesModeBtn;
@@ -312,10 +306,8 @@ public class SearchOverlay extends JPanel {
             } else {
                 FavoritesService.toggleFavorite(selected.getStopId());
             }
-            // Refresh the list to show updated star
             resultList.repaint();
             
-            // If in favorites mode, refresh the list
             if (currentMode == SearchMode.FAVORITES) {
                 favoriteStops = FavoritesService.getAllFavorites();
                 filterResults();
@@ -352,9 +344,6 @@ public class SearchOverlay extends JPanel {
         SwingUtilities.invokeLater(() -> searchField.requestFocusInWindow());
     }
     
-    /**
-     * Show favorites tab in the search overlay.
-     */
     public void showFavorites(List<Stop> favorites) {
         searchField.setText("");
         this.favoriteStops = favorites != null ? new ArrayList<>(favorites) : new ArrayList<>();
@@ -373,9 +362,6 @@ public class SearchOverlay extends JPanel {
         SwingUtilities.invokeLater(() -> searchField.requestFocusInWindow());
     }
     
-    /**
-     * Update the favorites list (called when favorites change).
-     */
     public void updateFavorites(List<Stop> favorites) {
         this.favoriteStops = new ArrayList<>(favorites);
         if (currentMode == SearchMode.FAVORITES) {
@@ -419,7 +405,6 @@ public class SearchOverlay extends JPanel {
             setBorder(new EmptyBorder(10, 14, 10, 14));
             setOpaque(true);
             
-            // Create yellow star icon for favorites
             yellowStarIcon = new ImageIcon(createYellowStar(16));
 
             JPanel textPanel = new JPanel();
@@ -438,7 +423,6 @@ public class SearchOverlay extends JPanel {
 
             add(textPanel, BorderLayout.CENTER);
             
-            // Star indicator for favorites
             starLabel = new JLabel();
             starLabel.setBorder(new EmptyBorder(0, 8, 0, 4));
             starLabel.setPreferredSize(new Dimension(24, 24));
@@ -467,9 +451,9 @@ public class SearchOverlay extends JPanel {
                 yPoints[i] = (int) (cy + r * Math.sin(angle));
             }
             
-            g2.setColor(new Color(255, 200, 50)); // Gold/Yellow fill
+            g2.setColor(new Color(255, 200, 50)); // Nota in italiano
             g2.fillPolygon(xPoints, yPoints, 10);
-            g2.setColor(new Color(200, 150, 0)); // Darker border
+            g2.setColor(new Color(200, 150, 0)); // Nota in italiano
             g2.drawPolygon(xPoints, yPoints, 10);
             g2.dispose();
             return img;
@@ -483,7 +467,6 @@ public class SearchOverlay extends JPanel {
             if (name.length() > 38) name = name.substring(0, 38) + "...";
             nameLabel.setText(name);
             
-            // Check favorite status
             boolean isFavorite;
             if (value.isFakeLine()) {
                 idLabel.setText("Linea bus");
@@ -493,7 +476,6 @@ public class SearchOverlay extends JPanel {
                 isFavorite = FavoritesService.isFavorite(value.getStopId());
             }
             
-            // Show yellow star if favorite
             starLabel.setIcon(isFavorite ? yellowStarIcon : null);
 
             if (isSelected) {

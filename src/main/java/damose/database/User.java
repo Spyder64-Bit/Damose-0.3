@@ -2,9 +2,6 @@ package damose.database;
 
 import java.time.LocalDateTime;
 
-/**
- * Model representing a user.
- */
 public class User {
 
     private int id;

@@ -15,9 +15,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Unit tests for RouteService.
- */
 @DisplayName("RouteService")
 class RouteServiceTest {
 
@@ -28,10 +25,9 @@ class RouteServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Create test data
         trips = Arrays.asList(
-            new Trip("64", "S1", "T64_1", "Termini → Colosseo", "64", 0, "SH1"),
-            new Trip("64", "S1", "T64_2", "Colosseo → Termini", "64", 1, "SH2"),
+            new Trip("64", "S1", "T64_1", "Termini Ã¢â€ â€™ Colosseo", "64", 0, "SH1"),
+            new Trip("64", "S1", "T64_2", "Colosseo Ã¢â€ â€™ Termini", "64", 1, "SH2"),
             new Trip("75", "S1", "T75_1", "Piazza Venezia", "75", 0, "SH3"),
             new Trip("75", "S1", "T75_2", "Termini", "75", 1, "SH4")
         );
@@ -48,15 +44,12 @@ class RouteServiceTest {
         LocalTime t3 = LocalTime.of(8, 20);
 
         stopTimes = Arrays.asList(
-            // Trip T64_1: S1 -> S2 -> S3
             new StopTime("T64_1", t1, t1, "S1", 1, "", 0, 0, 0, 1),
             new StopTime("T64_1", t2, t2, "S2", 2, "", 0, 0, 0, 1),
             new StopTime("T64_1", t3, t3, "S3", 3, "", 0, 0, 0, 1),
-            // Trip T64_2: S3 -> S2 -> S1
             new StopTime("T64_2", t1, t1, "S3", 1, "", 0, 0, 0, 1),
             new StopTime("T64_2", t2, t2, "S2", 2, "", 0, 0, 0, 1),
             new StopTime("T64_2", t3, t3, "S1", 3, "", 0, 0, 0, 1),
-            // Trip T75_1: S1 -> S4 (shorter trip)
             new StopTime("T75_1", t1, t1, "S1", 1, "", 0, 0, 0, 1),
             new StopTime("T75_1", t2, t2, "S4", 2, "", 0, 0, 0, 1)
         );
@@ -79,7 +72,7 @@ class RouteServiceTest {
         @Test
         @DisplayName("should find trip by routeId and headsign")
         void shouldFindTripByRouteIdAndHeadsign() {
-            Trip result = routeService.findRepresentativeTrip("64", "Colosseo → Termini");
+            Trip result = routeService.findRepresentativeTrip("64", "Colosseo Ã¢â€ â€™ Termini");
             assertNotNull(result);
             assertEquals("T64_2", result.getTripId());
         }
@@ -94,7 +87,7 @@ class RouteServiceTest {
         @Test
         @DisplayName("should be case insensitive")
         void shouldBeCaseInsensitive() {
-            Trip result = routeService.findRepresentativeTrip("64", "termini → colosseo");
+            Trip result = routeService.findRepresentativeTrip("64", "termini Ã¢â€ â€™ colosseo");
             assertNotNull(result);
         }
     }
@@ -155,7 +148,7 @@ class RouteServiceTest {
         @DisplayName("should return stops using trip with most stops")
         void shouldReturnStopsUsingTripWithMostStops() {
             List<Stop> result = routeService.getStopsForRoute("64");
-            assertEquals(3, result.size()); // T64_1 and T64_2 both have 3 stops
+            assertEquals(3, result.size()); // Nota in italiano
         }
 
         @Test
@@ -180,13 +173,12 @@ class RouteServiceTest {
         @Test
         @DisplayName("should return stops for specific direction")
         void shouldReturnStopsForSpecificDirection() {
-            List<Stop> outbound = routeService.getStopsForRouteAndHeadsign("64", "Termini → Colosseo");
-            List<Stop> inbound = routeService.getStopsForRouteAndHeadsign("64", "Colosseo → Termini");
+            List<Stop> outbound = routeService.getStopsForRouteAndHeadsign("64", "Termini Ã¢â€ â€™ Colosseo");
+            List<Stop> inbound = routeService.getStopsForRouteAndHeadsign("64", "Colosseo Ã¢â€ â€™ Termini");
             
             assertEquals(3, outbound.size());
             assertEquals(3, inbound.size());
             
-            // Different order for different directions
             assertEquals("S1", outbound.get(0).getStopId());
             assertEquals("S3", inbound.get(0).getStopId());
         }
@@ -208,8 +200,8 @@ class RouteServiceTest {
         void shouldReturnAllHeadsignsForRoute() {
             List<String> result = routeService.getHeadsignsForRoute("64");
             assertEquals(2, result.size());
-            assertTrue(result.contains("Termini → Colosseo"));
-            assertTrue(result.contains("Colosseo → Termini"));
+            assertTrue(result.contains("Termini Ã¢â€ â€™ Colosseo"));
+            assertTrue(result.contains("Colosseo Ã¢â€ â€™ Termini"));
         }
 
         @Test

@@ -21,34 +21,27 @@ import org.jxmapviewer.viewer.WaypointRenderer;
 import damose.model.BusWaypoint;
 import damose.model.VehicleType;
 
-/**
- * Renderer for vehicle waypoints on the map.
- * Shows different icons/colors for bus, tram, and metro.
- */
 public class BusWaypointRenderer implements WaypointRenderer<BusWaypoint> {
 
     private final EnumMap<VehicleType, Image> originalImages = new EnumMap<>(VehicleType.class);
     private final EnumMap<VehicleType, Map<Integer, Image>> sizeCaches = new EnumMap<>(VehicleType.class);
     
-    // Fallback colors for each vehicle type when image not available
     private static final EnumMap<VehicleType, Color> FALLBACK_COLORS = new EnumMap<>(VehicleType.class);
     
     static {
-        FALLBACK_COLORS.put(VehicleType.BUS, new Color(76, 175, 80));     // Green
-        FALLBACK_COLORS.put(VehicleType.TRAM, new Color(255, 152, 0));    // Orange
-        FALLBACK_COLORS.put(VehicleType.METRO, new Color(63, 81, 181));   // Indigo
-        FALLBACK_COLORS.put(VehicleType.RAIL, new Color(139, 69, 19));    // Brown
-        FALLBACK_COLORS.put(VehicleType.FERRY, new Color(0, 188, 212));   // Cyan
-        FALLBACK_COLORS.put(VehicleType.UNKNOWN, new Color(158, 158, 158)); // Gray
+        FALLBACK_COLORS.put(VehicleType.BUS, new Color(76, 175, 80)); // Nota in italiano
+        FALLBACK_COLORS.put(VehicleType.TRAM, new Color(255, 152, 0)); // Nota in italiano
+        FALLBACK_COLORS.put(VehicleType.METRO, new Color(63, 81, 181)); // Nota in italiano
+        FALLBACK_COLORS.put(VehicleType.RAIL, new Color(139, 69, 19)); // Nota in italiano
+        FALLBACK_COLORS.put(VehicleType.FERRY, new Color(0, 188, 212)); // Nota in italiano
+        FALLBACK_COLORS.put(VehicleType.UNKNOWN, new Color(158, 158, 158)); // Nota in italiano
     }
 
     public BusWaypointRenderer() {
-        // Load images for each vehicle type
         loadImage(VehicleType.BUS, "/sprites/bus.png");
         loadImage(VehicleType.TRAM, "/sprites/tram.png");
         loadImage(VehicleType.METRO, "/sprites/metro.png");
         
-        // Pre-cache common sizes for loaded images
         for (VehicleType type : originalImages.keySet()) {
             Map<Integer, Image> cache = new HashMap<>();
             Image orig = originalImages.get(type);
@@ -74,7 +67,6 @@ public class BusWaypointRenderer implements WaypointRenderer<BusWaypoint> {
     private Image getScaled(VehicleType type, int size) {
         Image original = originalImages.get(type);
         if (original == null) {
-            // Fall back to bus image if available
             original = originalImages.get(VehicleType.BUS);
             if (original == null) return null;
             type = VehicleType.BUS;
@@ -95,15 +87,12 @@ public class BusWaypointRenderer implements WaypointRenderer<BusWaypoint> {
     public void paintWaypoint(Graphics2D g, JXMapViewer map, BusWaypoint wp) {
         if (wp == null || wp.getPosition() == null) return;
         
-        // Convert geo position to world pixel coordinates
         Point2D worldPt = map.getTileFactory().geoToPixel(wp.getPosition(), map.getZoom());
         
-        // Convert world coordinates to screen coordinates
         Rectangle2D viewport = map.getViewportBounds();
         int screenX = (int) (worldPt.getX() - viewport.getX());
         int screenY = (int) (worldPt.getY() - viewport.getY());
         
-        // Skip if outside visible area
         if (screenX < -55 || screenX > map.getWidth() + 55 ||
             screenY < -55 || screenY > map.getHeight() + 55) {
             return;
@@ -119,11 +108,9 @@ public class BusWaypointRenderer implements WaypointRenderer<BusWaypoint> {
         if (img != null) {
             g.drawImage(img, screenX - size / 2, screenY - size / 2, null);
         } else {
-            // Fallback: draw a colored shape based on vehicle type
             drawFallbackShape(g, screenX, screenY, size, type);
         }
         
-        // Draw route label for larger zoom levels
         if (zoom <= 4 && wp.getRouteId() != null) {
             drawRouteLabel(g, screenX, screenY, size, wp.getRouteId(), type);
         }
@@ -136,7 +123,6 @@ public class BusWaypointRenderer implements WaypointRenderer<BusWaypoint> {
         
         switch (type) {
             case TRAM:
-                // Draw rounded rectangle for tram
                 g.setColor(color);
                 g.fillRoundRect(x - size/2, y - size/3, size, (int)(size * 0.66), 8, 8);
                 g.setColor(Color.WHITE);
@@ -145,7 +131,6 @@ public class BusWaypointRenderer implements WaypointRenderer<BusWaypoint> {
                 break;
                 
             case METRO:
-                // Draw octagon/diamond for metro
                 g.setColor(color);
                 int[] xPoints = {x, x + size/2, x + size/2, x, x - size/2, x - size/2};
                 int[] yPoints = {y - size/2, y - size/4, y + size/4, y + size/2, y + size/4, y - size/4};
@@ -156,7 +141,6 @@ public class BusWaypointRenderer implements WaypointRenderer<BusWaypoint> {
                 break;
                 
             default:
-                // Draw circle for bus and others
                 g.setColor(color);
                 g.fillOval(x - size/2, y - size/2, size, size);
                 g.setColor(Color.WHITE);
@@ -168,7 +152,6 @@ public class BusWaypointRenderer implements WaypointRenderer<BusWaypoint> {
     private void drawRouteLabel(Graphics2D g, int x, int y, int size, String routeId, VehicleType type) {
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         
-        // Draw label below the icon
         Font font = new Font("SansSerif", Font.BOLD, 10);
         g.setFont(font);
         
@@ -181,12 +164,10 @@ public class BusWaypointRenderer implements WaypointRenderer<BusWaypoint> {
         int labelX = x - labelWidth / 2;
         int labelY = y + size / 2 + 12;
         
-        // Background
         Color bgColor = type.getColor();
         g.setColor(new Color(bgColor.getRed(), bgColor.getGreen(), bgColor.getBlue(), 200));
         g.fillRoundRect(labelX - 3, labelY - 10, labelWidth + 6, 13, 4, 4);
         
-        // Text
         g.setColor(Color.WHITE);
         g.drawString(label, labelX, labelY);
     }

@@ -37,9 +37,6 @@ import damose.view.component.ServiceQualityPanel;
 import damose.view.map.GeoUtils;
 import damose.view.map.MapFactory;
 
-/**
- * Main application view - Midnight Dark style.
- */
 public class MainView {
 
     private JFrame frame;
@@ -61,7 +58,7 @@ public class MainView {
 
     private Point dragOffset;
     private boolean isDragging = false;
-    private Rectangle normalBounds = new Rectangle(100, 100, 1100, 750); // Store normal window bounds
+    private Rectangle normalBounds = new Rectangle(100, 100, 1100, 750); // Nota in italiano
 
     private final PropertyChangeListener mapListener = evt -> {
         String name = evt.getPropertyName();
@@ -128,10 +125,8 @@ public class MainView {
         frame.setSize(1100, 750);
         frame.setLocationRelativeTo(null);
         
-        // Set rounded corners
         frame.setShape(new RoundRectangle2D.Double(0, 0, 1100, 750, 20, 20));
         
-        // Update shape on resize
         frame.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
@@ -144,12 +139,10 @@ public class MainView {
             }
         });
         
-        // Set app icon
         try {
             ImageIcon icon = new ImageIcon(getClass().getResource("/sprites/icon.png"));
             if (icon.getImageLoadStatus() == MediaTracker.COMPLETE) {
                 List<Image> icons = new ArrayList<>();
-                // Create multiple scaled versions for taskbar (largest first for better quality)
                 Image scaled256 = icon.getImage().getScaledInstance(256, 256, Image.SCALE_SMOOTH);
                 Image scaled128 = icon.getImage().getScaledInstance(128, 128, Image.SCALE_SMOOTH);
                 Image scaled64 = icon.getImage().getScaledInstance(64, 64, Image.SCALE_SMOOTH);
@@ -166,7 +159,6 @@ public class MainView {
             System.out.println("Could not load app icon: " + e.getMessage());
         }
 
-        // Map takes the whole window
         mapViewer = MapFactory.createMapViewer();
 
         JLayeredPane layeredPane = new JLayeredPane();
@@ -180,7 +172,6 @@ public class MainView {
         overlayPanel.setBounds(0, 0, 1100, 750);
         layeredPane.add(overlayPanel, JLayeredPane.PALETTE_LAYER);
 
-        // Search button (top-left)
         ImageIcon lensIcon = new ImageIcon(getClass().getResource("/sprites/lente.png"));
         Image scaledLens = lensIcon.getImage().getScaledInstance(44, 44, Image.SCALE_SMOOTH);
         searchButton = new JButton(new ImageIcon(scaledLens));
@@ -191,7 +182,6 @@ public class MainView {
         searchButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         overlayPanel.add(searchButton);
         
-        // Favorites button (below search button)
         ImageIcon starIcon = new ImageIcon(getClass().getResource("/sprites/star.png"));
         Image scaledStar = starIcon.getImage().getScaledInstance(40, 40, Image.SCALE_SMOOTH);
         favoritesButton = new JButton(new ImageIcon(scaledStar));
@@ -202,7 +192,6 @@ public class MainView {
         favoritesButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         overlayPanel.add(favoritesButton);
         
-        // Bus visibility toggle button (below favorites)
         ImageIcon busIcon = new ImageIcon(getClass().getResource("/sprites/bus1.png"));
         Image scaledBus = busIcon.getImage().getScaledInstance(40, 40, Image.SCALE_SMOOTH);
         busToggleButton = new JButton(new ImageIcon(scaledBus));
@@ -213,15 +202,12 @@ public class MainView {
         busToggleButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         overlayPanel.add(busToggleButton);
         
-        // Window control buttons (top-right corner) - add first so connection button is below
         createWindowControls();
         
-        // Connection button (below window controls)
         connectionButton = new ConnectionButton();
         connectionButton.setBounds(1100 - 180, 48, 160, 48);
         overlayPanel.add(connectionButton);
         
-        // Service quality panel (bottom-left)
         serviceQualityPanel = new ServiceQualityPanel();
         serviceQualityPanel.setBounds(15, 750 - 65, 180, 50);
         overlayPanel.add(serviceQualityPanel);
@@ -236,7 +222,6 @@ public class MainView {
                 if (searchOverlay != null) {
                     searchOverlay.setBounds(0, 0, w, h);
                 }
-                // Update button positions
                 updateWindowControlPositions(w);
                 if (connectionButton != null) {
                     connectionButton.setBounds(w - 180, 48, 160, 48);
@@ -248,7 +233,6 @@ public class MainView {
             }
         });
         
-        // Enable window dragging from map
         enableWindowDrag();
 
         floatingPanel = new FloatingArrivalPanel();
@@ -268,29 +252,24 @@ public class MainView {
     }
     
     private void createWindowControls() {
-        // Close button (top-right corner)
         closeButton = createOverlayButton("X", AppConstants.ERROR_COLOR);
         closeButton.setBounds(1100 - 40, 6, 34, 34);
         closeButton.addActionListener(e -> System.exit(0));
         overlayPanel.add(closeButton);
         
-        // Maximize button
         maxButton = createOverlayButton("O", new java.awt.Color(120, 120, 120));
         maxButton.setBounds(1100 - 76, 6, 34, 34);
         maxButton.addActionListener(e -> {
             if (frame.getExtendedState() == JFrame.MAXIMIZED_BOTH) {
-                // Restore to normal size
                 frame.setExtendedState(JFrame.NORMAL);
                 frame.setBounds(normalBounds);
             } else {
-                // Save current bounds before maximizing
                 normalBounds = frame.getBounds();
                 frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
             }
         });
         overlayPanel.add(maxButton);
         
-        // Minimize button
         minButton = createOverlayButton("-", new java.awt.Color(120, 120, 120));
         minButton.setBounds(1100 - 112, 6, 34, 34);
         minButton.addActionListener(e -> frame.setState(JFrame.ICONIFIED));
@@ -300,7 +279,7 @@ public class MainView {
     private JButton createOverlayButton(String text, java.awt.Color hoverColor) {
         JButton btn = new JButton(text);
         btn.setFont(new Font("Segoe UI", Font.BOLD, 16));
-        btn.setForeground(new java.awt.Color(60, 60, 60)); // Dark color
+        btn.setForeground(new java.awt.Color(60, 60, 60)); // Nota in italiano
         btn.setContentAreaFilled(false);
         btn.setBorderPainted(false);
         btn.setFocusPainted(false);
@@ -326,11 +305,9 @@ public class MainView {
     }
     
     private void enableWindowDrag() {
-        // Allow dragging window from empty areas at the top
         mapViewer.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                // Only allow drag from top 50px area
                 if (e.getY() < 50 && e.getX() < mapViewer.getWidth() - 120) {
                     dragOffset = e.getPoint();
                     isDragging = true;
@@ -481,10 +458,8 @@ public class MainView {
     private void updateFloatingPanelPosition() {
         if (floatingAnchorGeo == null) return;
 
-        // STEP 1: PROJECT - Convert world coordinates to screen coordinates
         Point2D projectedPos = mapViewer.convertGeoPositionToPoint(floatingAnchorGeo);
         
-        // STEP 2: VALIDATE PROJECTION - If projection fails, stop is off-screen
         if (projectedPos == null) {
             if (floatingPanel.isVisible()) {
                 floatingPanel.setVisible(false);
@@ -497,8 +472,6 @@ public class MainView {
         double stopX = projectedPos.getX();
         double stopY = projectedPos.getY();
 
-        // STEP 3: DETECT OUT-OF-BOUNDS - Check if stop projection is beyond viewport
-        // If stop is beyond reasonable margin, hide panel (it's truly off-screen)
         int offScreenMargin = 200;
         if (stopX < -offScreenMargin || stopX > mapWidth + offScreenMargin ||
             stopY < -offScreenMargin || stopY > mapHeight + offScreenMargin) {
@@ -508,43 +481,31 @@ public class MainView {
             return;
         }
 
-        // STEP 4: CALCULATE TARGET POSITION - Where panel should go based on stop projection
         Dimension pref = floatingPanel.getPreferredPanelSize();
         int panelWidth = pref.width;
         int panelHeight = pref.height;
         
-        // Calculate ideal panel position (centered above stop, no clamping)
         int targetX = (int) stopX - panelWidth / 2;
         int targetY = (int) stopY - panelHeight - 8;
 
-        // STEP 5: DETACHMENT VALIDATION - Check if panel can be placed without clamping
-        // If the panel needs to be clamped to screen bounds, it means the stop is at the edge
-        // and the panel position would diverge from the stop's true projection.
-        // This is detachment - the panel would "stick" to screen edge while stop goes off-screen.
         
         int minValidX = 5;
         int maxValidX = mapWidth - panelWidth - 5;
         int minValidY = 5;
         int maxValidY = mapHeight - panelHeight - 5;
         
-        // Panel cannot be placed at its true position without clamping
         if (targetX < minValidX || targetX > maxValidX ||
             targetY < minValidY || targetY > maxValidY) {
-            // Stop is too close to edge - panel would need clamping
-            // This breaks the spatial binding, so hide the panel
             if (floatingPanel.isVisible()) {
                 floatingPanel.setVisible(false);
             }
             return;
         }
 
-        // STEP 6: SHOW AND POSITION - Panel can stay bound to stop projection
-        // Stop is visible and panel can be placed at its true screen position
         if (!floatingPanel.isVisible()) {
             floatingPanel.setVisible(true);
         }
 
-        // Place panel at exact projected position (no clamping or correction)
         floatingPanel.setBounds(targetX, targetY, panelWidth, panelHeight);
         floatingPanel.revalidate();
         floatingPanel.repaint();

@@ -9,19 +9,11 @@ import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.Base64;
 
-/**
- * Service for user management (registration, login, etc.).
- */
 public final class UserService {
 
     private UserService() {
-        // Utility class
     }
 
-    /**
-     * Register a new user.
-     * @return true if registration succeeded, false if username exists
-     */
     public static boolean register(String username, String password, String email) {
         String hashedPassword = hashPassword(password);
 
@@ -48,10 +40,6 @@ public final class UserService {
         }
     }
 
-    /**
-     * Login a user.
-     * @return User object if credentials are valid, null otherwise
-     */
     public static User login(String username, String password) {
         String hashedPassword = hashPassword(password);
 
@@ -84,9 +72,6 @@ public final class UserService {
         return null;
     }
 
-    /**
-     * Check if username exists.
-     */
     public static boolean usernameExists(String username) {
         String sql = "SELECT COUNT(*) FROM users WHERE username = ?";
 
@@ -104,9 +89,6 @@ public final class UserService {
         }
     }
 
-    /**
-     * Change user password.
-     */
     public static boolean changePassword(int userId, String oldPassword, String newPassword) {
         String oldHash = hashPassword(oldPassword);
         String newHash = hashPassword(newPassword);
@@ -129,9 +111,6 @@ public final class UserService {
         }
     }
 
-    /**
-     * Hash password using SHA-256.
-     */
     private static String hashPassword(String password) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");

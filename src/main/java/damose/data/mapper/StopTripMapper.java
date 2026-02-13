@@ -13,10 +13,6 @@ import java.util.stream.Collectors;
 import damose.model.StopTime;
 import damose.model.Trip;
 
-/**
- * Maps stops to trips and provides trip sequence lookups.
- * Memory optimized: uses lazy variant lookup instead of pre-computing all variants.
- */
 public class StopTripMapper {
 
     private final Map<String, List<StopTime>> stopToTrips = new HashMap<>();
@@ -27,7 +23,6 @@ public class StopTripMapper {
     public StopTripMapper(List<StopTime> stopTimes, TripMatcher matcher) {
         this.matcher = matcher;
 
-        // Build maps without variant explosion
         for (StopTime st : stopTimes) {
             String stopId = st.getStopId();
             String rawTripId = st.getTripId();
@@ -38,13 +33,11 @@ public class StopTripMapper {
 
             stopToTrips.computeIfAbsent(stopId, k -> new ArrayList<>()).add(st);
 
-            // Only index normalized trip ID (not all variants - too memory intensive)
             tripSeqToStop
                     .computeIfAbsent(normTripId, k -> new HashMap<>())
                     .put(seq, stopId);
         }
 
-        // Sort stop times by arrival
         for (List<StopTime> list : stopToTrips.values()) {
             list.sort(Comparator.comparing(StopTime::getArrivalTime, Comparator.nullsLast(Comparator.naturalOrder())));
         }
@@ -72,7 +65,6 @@ public class StopTripMapper {
     public String getStopIdByTripAndSequence(String tripId, int sequence) {
         if (tripId == null) return null;
 
-        // Try direct normalized lookup (most common case)
         String norm = normalizeTripId(tripId);
         Map<Integer, String> seqMap = tripSeqToStop.get(norm);
         if (seqMap != null) {
@@ -82,8 +74,6 @@ public class StopTripMapper {
             }
         }
 
-        // Lazy variant lookup only if direct lookup fails
-        // Only try simple variant (without separator changes)
         String simple = TripIdUtils.normalizeSimple(tripId);
         if (simple != null && !simple.equals(norm)) {
             seqMap = tripSeqToStop.get(simple);
@@ -104,7 +94,9 @@ public class StopTripMapper {
 
     private String normalizeTripId(String id) {
         if (id == null) return null;
-        return id.replaceFirst("^\\d+#", "").trim();
+        String normalized = TripIdUtils.normalizeSimple(id);
+        return normalized != null ? normalized : id.trim();
     }
+
 }
 

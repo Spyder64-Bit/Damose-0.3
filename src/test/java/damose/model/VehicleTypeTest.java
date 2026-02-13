@@ -10,9 +10,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Unit tests for VehicleType enum.
- */
 @DisplayName("VehicleType")
 class VehicleTypeTest {
 
@@ -81,7 +78,7 @@ class VehicleTypeTest {
             assertEquals("Bus", bus.getDisplayName());
             assertEquals("bus.png", bus.getIconFileName());
             assertNotNull(bus.getColor());
-            assertEquals("🚌", bus.getEmoji());
+            assertEquals("ðŸšŒ", bus.getEmoji());
         }
 
         @Test
@@ -91,7 +88,7 @@ class VehicleTypeTest {
             assertEquals(0, tram.getGtfsCode());
             assertEquals("Tram", tram.getDisplayName());
             assertEquals("tram.png", tram.getIconFileName());
-            assertEquals("🚋", tram.getEmoji());
+            assertEquals("ðŸš‹", tram.getEmoji());
         }
 
         @Test
@@ -101,7 +98,7 @@ class VehicleTypeTest {
             assertEquals(1, metro.getGtfsCode());
             assertEquals("Metro", metro.getDisplayName());
             assertEquals("metro.png", metro.getIconFileName());
-            assertEquals("🚇", metro.getEmoji());
+            assertEquals("ðŸš‡", metro.getEmoji());
         }
     }
 

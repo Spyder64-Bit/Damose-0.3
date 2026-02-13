@@ -1,8 +1,5 @@
 package damose.model;
 
-/**
- * Represents a route from GTFS routes.txt.
- */
 public class Route {
     
     private final String routeId;
@@ -52,9 +49,6 @@ public class Route {
         return routeTextColor;
     }
     
-    /**
-     * Get display name: short name if available, otherwise route ID.
-     */
     public String getDisplayName() {
         if (routeShortName != null && !routeShortName.isEmpty()) {
             return routeShortName;

@@ -31,10 +31,6 @@ import javax.swing.Timer;
 
 import damose.config.AppConstants;
 
-/**
- * Floating panel showing arrivals at a stop.
- * Clean design with dark background and light text.
- */
 public class FloatingArrivalPanel extends JPanel {
 
     private JLabel title;
@@ -55,7 +51,6 @@ public class FloatingArrivalPanel extends JPanel {
     private String currentStopName;
     private boolean isFavorite;
     
-    // View mode: false = normal arrivals, true = all trips of day
     private boolean viewAllMode = false;
     private List<String> normalArrivals = new ArrayList<>();
     private List<String> allTripsData = new ArrayList<>();
@@ -74,7 +69,6 @@ public class FloatingArrivalPanel extends JPanel {
         setLayout(null);
         setOpaque(false);
         
-        // Load star icons
         loadStarIcons();
 
         content = new JPanel(new BorderLayout());
@@ -94,7 +88,6 @@ public class FloatingArrivalPanel extends JPanel {
         title.setFont(TITLE_FONT);
         title.setMaximumSize(new Dimension(AppConstants.FLOATING_PANEL_WIDTH - 60, 30));
 
-        // Favorite button (star)
         favoriteButton = new JButton();
         favoriteButton.setFocusPainted(false);
         favoriteButton.setOpaque(false);
@@ -102,7 +95,7 @@ public class FloatingArrivalPanel extends JPanel {
         favoriteButton.setBorderPainted(false);
         favoriteButton.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
         favoriteButton.setPreferredSize(new Dimension(28, 28));
-        favoriteButton.setIcon(starFilledIcon); // star.png by default (not favorite)
+        favoriteButton.setIcon(starFilledIcon); // Nota in italiano
         favoriteButton.setToolTipText("Aggiungi ai preferiti");
         favoriteButton.addActionListener(e -> {
             if (onFavoriteToggle != null) {
@@ -146,7 +139,6 @@ public class FloatingArrivalPanel extends JPanel {
         scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
 
-        // Footer with "View All Trips" button
         footerPanel = new JPanel();
         footerPanel.setLayout(new BoxLayout(footerPanel, BoxLayout.Y_AXIS));
         footerPanel.setOpaque(false);
@@ -212,20 +204,15 @@ public class FloatingArrivalPanel extends JPanel {
     
     public void setFavoriteStatus(boolean favorite) {
         this.isFavorite = favorite;
-        // favorite=TRUE → Yellow outline star (starEmptyIcon - now yellow)
-        // favorite=FALSE → star.png (starFilledIcon)
         if (favorite) {
-            favoriteButton.setIcon(starEmptyIcon);  // Yellow outline
+            favoriteButton.setIcon(starEmptyIcon); // Nota in italiano
             favoriteButton.setToolTipText("Rimuovi dai preferiti");
         } else {
-            favoriteButton.setIcon(starFilledIcon); // star.png
+            favoriteButton.setIcon(starFilledIcon); // Nota in italiano
             favoriteButton.setToolTipText("Aggiungi ai preferiti");
         }
     }
     
-    /**
-     * Show all trips data for the day.
-     */
     public void showAllTripsView(List<String> allTrips) {
         this.allTripsData = new ArrayList<>(allTrips);
         this.viewAllMode = true;
@@ -234,7 +221,6 @@ public class FloatingArrivalPanel extends JPanel {
         viewAllButton.setVisible(false);
         backButton.setVisible(true);
         
-        // Update arrivals list with all trips
         arrivalsList.removeAll();
         
         if (allTrips.isEmpty()) {
@@ -245,7 +231,6 @@ public class FloatingArrivalPanel extends JPanel {
             arrivalsList.add(noData);
         } else {
             for (String trip : allTrips) {
-                // Use HTML to enable text wrapping
                 String html = "<html><body style='width:" + (AppConstants.FLOATING_PANEL_WIDTH - 60) + "px'>" + trip + "</body></html>";
                 JLabel label = new JLabel(html);
                 label.setForeground(Color.WHITE);
@@ -254,7 +239,6 @@ public class FloatingArrivalPanel extends JPanel {
                 label.setMaximumSize(new Dimension(AppConstants.FLOATING_PANEL_WIDTH - 40, 70));
                 label.setVerticalTextPosition(JLabel.TOP);
                 
-                // Color based on RT status
                 if (trip.contains("[+") || trip.contains("ritardo")) {
                     label.setForeground(AppConstants.ERROR_COLOR);
                 } else if (trip.contains("[-") || trip.contains("[OK]")) {
@@ -265,15 +249,11 @@ public class FloatingArrivalPanel extends JPanel {
             }
         }
         
-        // For all trips view, show more rows (up to 12)
         int visibleRows = Math.min(Math.max(allTrips.size(), 1), 12);
         arrivalsList.revalidate();
         updatePanelSizeForTrips(visibleRows);
     }
     
-    /**
-     * Return to normal arrivals view.
-     */
     public void showNormalView() {
         viewAllMode = false;
         
@@ -284,7 +264,6 @@ public class FloatingArrivalPanel extends JPanel {
         viewAllButton.setVisible(true);
         backButton.setVisible(false);
         
-        // Restore normal arrivals
         arrivalsList.removeAll();
         displayArrivals(normalArrivals);
         
@@ -304,7 +283,6 @@ public class FloatingArrivalPanel extends JPanel {
                 dotColor = AppConstants.TEXT_SECONDARY;
             }
 
-            // Use HTML to enable text wrapping for long lines
             String html = "<html><body style='width:" + (AppConstants.FLOATING_PANEL_WIDTH - 60) + "px'>" + a + "</body></html>";
             JLabel label = new JLabel(html);
             label.setForeground(Color.WHITE);
@@ -319,8 +297,6 @@ public class FloatingArrivalPanel extends JPanel {
     }
     
     private void updatePanelSize(int rows) {
-        // For normal arrivals: header (50) + rows*44 + footer (40) + padding (10)
-        // Increased row height to 44 to accommodate potential wrapped text
         int rowHeight = 44;
         int headerHeight = 50;
         int footerHeight = 40;
@@ -333,8 +309,7 @@ public class FloatingArrivalPanel extends JPanel {
     }
     
     private void updatePanelSizeForTrips(int rows) {
-        // For all trips view: row height adjusted for potential wrapped text
-        int rowHeight = 30;  // Reduced from 40
+        int rowHeight = 30; // Nota in italiano
         int headerHeight = 50;
         int footerHeight = 40;
         int padding = 10;
@@ -342,7 +317,6 @@ public class FloatingArrivalPanel extends JPanel {
         int scrollHeight = Math.max(rows * rowHeight, rowHeight);
         int contentHeight = headerHeight + scrollHeight + footerHeight + padding;
         
-        // Keep panel significantly smaller (maximum 150px scroll area to prevent going off-camera)
         scrollHeight = Math.min(Math.max(scrollHeight, 80), 150);
         contentHeight = headerHeight + scrollHeight + footerHeight + padding;
         
@@ -350,7 +324,6 @@ public class FloatingArrivalPanel extends JPanel {
     }
     
     private void applyPanelSize(int contentHeight, int scrollHeight) {
-        // Update content bounds
         content.setBounds(0, 0, AppConstants.FLOATING_PANEL_WIDTH, contentHeight);
         scrollPane.setPreferredSize(new Dimension(
                 AppConstants.FLOATING_PANEL_WIDTH - 28, 
@@ -359,17 +332,14 @@ public class FloatingArrivalPanel extends JPanel {
                 AppConstants.FLOATING_PANEL_WIDTH - 28, 
                 scrollHeight));
         
-        // Update this panel's size - critical for proper display
         setPreferredSize(new Dimension(AppConstants.FLOATING_PANEL_WIDTH, contentHeight));
         setSize(AppConstants.FLOATING_PANEL_WIDTH, contentHeight);
         
-        // Force full revalidation and repaint
         content.revalidate();
         content.repaint();
         revalidate();
         repaint();
         
-        // Also repaint parent if exists
         if (getParent() != null) {
             getParent().revalidate();
             getParent().repaint();
@@ -378,14 +348,11 @@ public class FloatingArrivalPanel extends JPanel {
     
     private void loadStarIcons() {
         try {
-            // Load star.png for NOT FAVORITE state
             ImageIcon starIcon = new ImageIcon(getClass().getResource("/sprites/star.png"));
             Image scaled = starIcon.getImage().getScaledInstance(22, 22, Image.SCALE_SMOOTH);
             
-            // starFilledIcon = star.png - shown when NOT FAVORITE
             starFilledIcon = new ImageIcon(scaled);
             
-            // starEmptyIcon = YELLOW filled star - shown when IS FAVORITE
             starEmptyIcon = new ImageIcon(createOutlineImage(starIcon.getImage(), 22));
             
         } catch (Exception e) {
@@ -402,7 +369,6 @@ public class FloatingArrivalPanel extends JPanel {
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         
-        // Draw a YELLOW filled star (for IS FAVORITE)
         int[] xPoints = new int[10];
         int[] yPoints = new int[10];
         double angleStep = Math.PI / 5;
@@ -418,10 +384,9 @@ public class FloatingArrivalPanel extends JPanel {
             yPoints[i] = (int) (cy + r * Math.sin(angle));
         }
         
-        // Yellow filled star (IS FAVORITE)
-        g2.setColor(new Color(255, 200, 50)); // Gold/Yellow
+        g2.setColor(new Color(255, 200, 50)); // Nota in italiano
         g2.fillPolygon(xPoints, yPoints, 10);
-        g2.setColor(new Color(200, 150, 0)); // Darker border
+        g2.setColor(new Color(200, 150, 0)); // Nota in italiano
         g2.setStroke(new BasicStroke(1f));
         g2.drawPolygon(xPoints, yPoints, 10);
         g2.dispose();
@@ -500,7 +465,6 @@ public class FloatingArrivalPanel extends JPanel {
         String displayName = safeName.length() > 25 ? safeName.substring(0, 25) + "..." : safeName;
         title.setText("Arrivi a " + displayName);
 
-        // Reset to normal view
         viewAllButton.setVisible(true);
         backButton.setVisible(false);
         

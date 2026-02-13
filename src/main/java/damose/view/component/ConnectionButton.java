@@ -38,16 +38,13 @@ public class ConnectionButton extends JButton {
         setOpaque(false);
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         
-        // Remove all button decorations and recoloring
         setMargin(new java.awt.Insets(0, 0, 0, 0));
         setRolloverEnabled(false);
         
-        // Prevent button model from applying visual effects
         getModel().setArmed(false);
         getModel().setPressed(false);
         getModel().setSelected(false);
 
-        // Let icon define button size
         if (wifiIcon != null) {
             int width = wifiIcon.getIconWidth();
             int height = wifiIcon.getIconHeight();

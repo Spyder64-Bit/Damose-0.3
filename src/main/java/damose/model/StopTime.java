@@ -2,10 +2,6 @@ package damose.model;
 
 import java.time.LocalTime;
 
-/**
- * Represents a stop time from GTFS static data.
- * Links a trip to a stop at a specific time.
- */
 public class StopTime {
 
     private final String tripId;
@@ -34,7 +30,6 @@ public class StopTime {
         this.timepoint = timepoint;
     }
 
-    // -------- Getters --------
     public String getTripId() {
         return tripId;
     }
@@ -77,6 +72,6 @@ public class StopTime {
 
     @Override
     public String toString() {
-        return tripId + " @ " + stopId + " → " + arrivalTime;
+        return tripId + " @ " + stopId + " â†’ " + arrivalTime;
     }
 }

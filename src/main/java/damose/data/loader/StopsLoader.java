@@ -9,13 +9,9 @@ import java.util.List;
 import damose.config.AppConstants;
 import damose.model.Stop;
 
-/**
- * Loader for GTFS stops.txt file.
- */
 public final class StopsLoader {
 
     private StopsLoader() {
-        // Utility class
     }
 
     public static List<Stop> load() {
@@ -28,7 +24,6 @@ public final class StopsLoader {
         try (InputStream in = StopsLoader.class.getResourceAsStream(resourcePath);
              BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
 
-            // Skip header
             br.readLine();
 
             String line;

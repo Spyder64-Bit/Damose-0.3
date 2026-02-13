@@ -7,20 +7,13 @@ import java.sql.Statement;
 
 import damose.config.AppConstants;
 
-/**
- * Manages database connection and table initialization.
- */
 public final class DatabaseManager {
 
     private static Connection connection;
 
     private DatabaseManager() {
-        // Utility class
     }
 
-    /**
-     * Get database connection (singleton).
-     */
     public static Connection getConnection() throws SQLException {
         if (connection == null || connection.isClosed()) {
             connection = DriverManager.getConnection(AppConstants.DB_URL);
@@ -28,14 +21,10 @@ public final class DatabaseManager {
         return connection;
     }
 
-    /**
-     * Initialize database by creating necessary tables.
-     */
     public static void initialize() {
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement()) {
 
-            // Users table
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +35,6 @@ public final class DatabaseManager {
                 )
             """);
 
-            // Favorite stops table
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS favorite_stops (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,7 +47,6 @@ public final class DatabaseManager {
                 )
             """);
 
-            // Favorite lines table
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS favorite_lines (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -72,7 +59,6 @@ public final class DatabaseManager {
                 )
             """);
 
-            // Search history table
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS search_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,9 +77,6 @@ public final class DatabaseManager {
         }
     }
 
-    /**
-     * Close database connection.
-     */
     public static void close() {
         try {
             if (connection != null && !connection.isClosed()) {

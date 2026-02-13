@@ -12,18 +12,11 @@ import damose.data.mapper.TripIdUtils;
 import damose.model.TripUpdateRecord;
 import damose.model.VehiclePosition;
 
-/**
- * Parser for GTFS-RT feeds (TripUpdates and VehiclePositions).
- */
 public final class GtfsParser {
 
     private GtfsParser() {
-        // Utility class
     }
 
-    /**
-     * Parse TripUpdates from feed and return a list of TripUpdateRecord.
-     */
     public static List<TripUpdateRecord> parseTripUpdates(GtfsRealtime.FeedMessage feed,
                                                           StopTripMapper stopTripMapper,
                                                           Long feedHeaderTs) {
@@ -36,10 +29,11 @@ public final class GtfsParser {
             GtfsRealtime.TripUpdate tu = entity.getTripUpdate();
             String rawTripId = (tu.hasTrip() && tu.getTrip().hasTripId()) 
                     ? tu.getTrip().getTripId() : null;
+            String rawRouteId = (tu.hasTrip() && tu.getTrip().hasRouteId())
+                    ? tu.getTrip().getRouteId() : null;
             String simple = TripIdUtils.normalizeSimple(rawTripId);
 
             for (GtfsRealtime.TripUpdate.StopTimeUpdate stu : tu.getStopTimeUpdateList()) {
-                // Filter useless relations
                 if (stu.hasScheduleRelationship()) {
                     GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship rel = 
                             stu.getScheduleRelationship();
@@ -49,10 +43,16 @@ public final class GtfsParser {
                     }
                 }
 
-                // Extract stopId or map from stop_sequence
-                String stopId = (stu.hasStopId() ? stu.getStopId().trim() : null);
-                boolean hadStopId = stopId != null && !stopId.isBlank();
-                if (!hadStopId && stu.hasStopSequence() && rawTripId != null) {
+                String stopId = stu.hasStopId() ? normalizeStopId(stu.getStopId()) : null;
+                boolean hasUsableStopId = stopId != null && !stopId.isBlank();
+                boolean isKnownStopId = hasUsableStopId
+                        && stopTripMapper != null
+                        && stopTripMapper.isKnownStopId(stopId);
+
+                if ((!hasUsableStopId || !isKnownStopId)
+                        && stu.hasStopSequence()
+                        && stopTripMapper != null
+                        && rawTripId != null) {
                     int seq = stu.getStopSequence();
                     String mapped = stopTripMapper.getStopIdByTripAndSequence(rawTripId, seq);
                     if (mapped == null || mapped.isBlank()) {
@@ -63,7 +63,6 @@ public final class GtfsParser {
                     }
                 }
 
-                // Time: prefer ARRIVAL, fallback to DEPARTURE
                 long rawTime = -1;
                 if (stu.hasArrival() && stu.getArrival().hasTime()) {
                     rawTime = stu.getArrival().getTime();
@@ -73,7 +72,7 @@ public final class GtfsParser {
 
                 long arrivalEpoch = normalizeEpoch(rawTime);
                 if (stopId != null && !stopId.isBlank() && arrivalEpoch > 0) {
-                    updates.add(new TripUpdateRecord(rawTripId, stopId, arrivalEpoch));
+                    updates.add(new TripUpdateRecord(rawTripId, rawRouteId, stopId, arrivalEpoch));
                 }
             }
         }
@@ -81,9 +80,6 @@ public final class GtfsParser {
         return updates;
     }
 
-    /**
-     * Parse VehiclePositions from feed.
-     */
     public static List<VehiclePosition> parseVehiclePositions(GtfsRealtime.FeedMessage feed) {
         List<VehiclePosition> positions = new ArrayList<>();
         if (feed == null) return positions;
@@ -98,11 +94,18 @@ public final class GtfsParser {
             String vehicleId = (vehicle.hasVehicle() && vehicle.getVehicle().hasId()) 
                     ? vehicle.getVehicle().getId() : null;
 
-            double lat = vehicle.hasPosition() ? vehicle.getPosition().getLatitude() : 0.0;
-            double lon = vehicle.hasPosition() ? vehicle.getPosition().getLongitude() : 0.0;
+            if (!vehicle.hasPosition()) {
+                continue;
+            }
+
+            double lat = vehicle.getPosition().getLatitude();
+            double lon = vehicle.getPosition().getLongitude();
             int stopSeq = vehicle.hasCurrentStopSequence() ? vehicle.getCurrentStopSequence() : -1;
 
-            // Fix microdegrees if necessary
+            if (!Double.isFinite(lat) || !Double.isFinite(lon)) {
+                continue;
+            }
+
             if (Math.abs(lat) > 90 || Math.abs(lon) > 180) {
                 double latC = lat / 1_000_000.0;
                 double lonC = lon / 1_000_000.0;
@@ -113,6 +116,10 @@ public final class GtfsParser {
             }
 
             if (Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+                continue;
+            }
+
+            if (lat == 0.0 && lon == 0.0) {
                 continue;
             }
 
@@ -127,18 +134,37 @@ public final class GtfsParser {
         return positions;
     }
 
-    /**
-     * Normalize epoch seconds: accepts seconds, converts milliseconds, discards implausible values.
-     */
+    private static String normalizeStopId(String stopId) {
+        if (stopId == null) return null;
+        String normalized = stopId.trim();
+
+        while (true) {
+            String lower = normalized.toLowerCase();
+            if (lower.startsWith("stop:")) {
+                normalized = normalized.substring("stop:".length()).trim();
+                continue;
+            }
+            int colon = normalized.indexOf(':');
+            if (colon > 0 && colon < 6) {
+                normalized = normalized.substring(colon + 1).trim();
+                continue;
+            }
+            break;
+        }
+
+        normalized = normalized.replaceFirst("^\\d+#", "");
+
+        normalized = normalized.replaceFirst("[_:]\\d+$", "");
+        return normalized;
+    }
+
     private static long normalizeEpoch(long raw) {
         if (raw <= 0) return -1;
 
-        // Milliseconds -> seconds
         if (raw >= 1_000_000_000_000L) {
             return raw / 1000L;
         }
 
-        // Plausible seconds
         if (raw >= 1_000_000_000L) {
             return raw;
         }

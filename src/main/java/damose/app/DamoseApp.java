@@ -12,28 +12,21 @@ import damose.service.RealtimeService;
 import damose.view.dialog.LoadingDialog;
 import damose.view.dialog.LoginDialog;
 
-/**
- * Main application entry point.
- */
 public class DamoseApp {
 
     private static LoadingDialog loadingDialog;
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            // Show login frame first
             LoginDialog loginDialog = new LoginDialog(null);
             
-            // Set callback for when login completes
             loginDialog.setOnComplete(user -> {
-                // Check if cancelled (user is null AND wasCancelled)
                 if (loginDialog.wasCancelled()) {
                     System.out.println("Login cancelled, exiting...");
                     System.exit(0);
                     return;
                 }
 
-                // Set session (can be null if skipped)
                 SessionManager.setCurrentUser(user);
 
                 if (user != null) {
@@ -42,15 +35,12 @@ public class DamoseApp {
                     System.out.println("Continuing without account");
                 }
 
-                // Start loading process
                 startLoadingProcess();
             });
             
-            // Show the login dialog
             loginDialog.setVisible(true);
         });
 
-        // Shutdown hook to close database
         Runtime.getRuntime().addShutdownHook(new Thread(DatabaseManager::close));
     }
 
@@ -58,19 +48,15 @@ public class DamoseApp {
         loadingDialog = new LoadingDialog(null);
         loadingDialog.setVisible(true);
 
-        // Run loading steps in background thread
         new Thread(() -> {
             try {
-                // Step 1: Initialization
                 SwingUtilities.invokeLater(() -> loadingDialog.stepInitStart());
                 Thread.sleep(300);
 
-                // Initialize database
                 DatabaseManager.initialize();
                 SwingUtilities.invokeLater(() -> loadingDialog.stepInitDone());
                 Thread.sleep(200);
 
-                // Step 2: Static GTFS data
                 SwingUtilities.invokeLater(() -> loadingDialog.stepStaticStart());
 
                 SwingUtilities.invokeLater(() -> loadingDialog.stepStaticProgress("stops.txt"));
@@ -85,10 +71,8 @@ public class DamoseApp {
                 SwingUtilities.invokeLater(() -> loadingDialog.stepStaticDone(8000, 15000));
                 Thread.sleep(300);
 
-                // Step 3: RT data
                 SwingUtilities.invokeLater(() -> loadingDialog.stepRTStart(AppConstants.RT_TIMEOUT_SECONDS));
 
-                // Set up callback for when RT data is received
                 RealtimeService.setOnDataReceived(() -> {
                     SwingUtilities.invokeLater(() -> {
                         loadingDialog.stepRTDone();
@@ -96,11 +80,9 @@ public class DamoseApp {
                     });
                 });
 
-                // Start fetching RT data
                 RealtimeService.setMode(ConnectionMode.ONLINE);
                 RealtimeService.fetchRealtimeFeeds();
 
-                // Timeout check
                 Timer timeoutCheck = new Timer(AppConstants.RT_TIMEOUT_SECONDS * 1000 + 500, e -> {
                     ((Timer) e.getSource()).stop();
                     if (!loadingDialog.isDataReceived()) {
@@ -119,14 +101,11 @@ public class DamoseApp {
     private static void finishLoading() {
         loadingDialog.stepAppStart();
 
-        // Load the app in background while keeping the loading dialog visible
         new Thread(() -> {
             try {
-                // Create and start the controller (this does the actual data loading)
                 MainController controller = new MainController();
                 controller.start();
 
-                // After data is loaded and view is ready, close loading dialog
                 SwingUtilities.invokeLater(() -> {
                     loadingDialog.stepAppDone();
                     loadingDialog.setProgress(100, "Pronto!");

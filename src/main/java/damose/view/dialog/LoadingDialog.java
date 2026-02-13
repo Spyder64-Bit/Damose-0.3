@@ -25,10 +25,6 @@ import javax.swing.border.EmptyBorder;
 
 import damose.config.AppConstants;
 
-/**
- * Elegant loading frame with animated progress.
- * Uses JFrame to appear in taskbar for a seamless app experience.
- */
 public class LoadingDialog extends JFrame {
 
     private final JLabel statusLabel;
@@ -49,7 +45,6 @@ public class LoadingDialog extends JFrame {
         setLocationRelativeTo(parent);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         
-        // Set app icon
         try {
             ImageIcon icon = new ImageIcon(getClass().getResource("/sprites/icon.png"));
             List<Image> icons = new ArrayList<>();
@@ -78,7 +73,6 @@ public class LoadingDialog extends JFrame {
         headerPanel.setOpaque(false);
         headerPanel.setLayout(new BoxLayout(headerPanel, BoxLayout.Y_AXIS));
 
-        // Icon + Title row (centered)
         JPanel titleRow = new JPanel();
         titleRow.setOpaque(false);
         titleRow.setLayout(new BoxLayout(titleRow, BoxLayout.X_AXIS));
@@ -91,7 +85,6 @@ public class LoadingDialog extends JFrame {
             titleRow.add(iconLabel);
             titleRow.add(Box.createHorizontalStrut(12));
         } catch (Exception e) {
-            // Icon not found
         }
 
         JLabel titleLabel = new JLabel("DAMOSE");
@@ -187,7 +180,6 @@ public class LoadingDialog extends JFrame {
         void setState(State newState) {
             this.state = newState;
             
-            // Stop animation timer if running
             if (animationTimer != null) {
                 animationTimer.stop();
                 animationTimer = null;
@@ -221,12 +213,10 @@ public class LoadingDialog extends JFrame {
                         textLabel.setFont(new Font("Segoe UI", Font.BOLD, 15));
                         break;
                     case DONE:
-                        // Load tick.png with proper async handling
                         try {
                             java.net.URL url = getClass().getResource("/sprites/tick.png");
                             if (url != null) {
                                 ImageIcon tickIcon = new ImageIcon(url);
-                                // Wait for image to load
                                 java.awt.MediaTracker tracker = new java.awt.MediaTracker(iconLabel);
                                 tracker.addImage(tickIcon.getImage(), 0);
                                 tracker.waitForAll();

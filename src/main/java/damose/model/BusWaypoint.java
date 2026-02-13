@@ -6,9 +6,6 @@ import damose.data.loader.RoutesLoader;
 import damose.model.Route;
 import damose.model.VehiclePosition;
 
-/**
- * Waypoint representing a vehicle (bus, tram, metro) on the map.
- */
 public class BusWaypoint extends DefaultWaypoint {
 
     private final String tripId;
@@ -24,12 +21,11 @@ public class BusWaypoint extends DefaultWaypoint {
         this.tripHeadsign = tripHeadsign;
         this.routeId = routeId;
         
-        // Determine vehicle type from route
         Route route = RoutesLoader.getRouteById(routeId);
         if (route != null) {
             this.vehicleType = route.getVehicleType();
         } else {
-            this.vehicleType = VehicleType.BUS; // Default to bus
+            this.vehicleType = VehicleType.BUS; // Nota in italiano
         }
     }
 

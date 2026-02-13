@@ -15,9 +15,6 @@ import org.jxmapviewer.viewer.GeoPosition;
 
 import damose.config.AppConstants;
 
-/**
- * Painter for drawing bus line routes on the map.
- */
 public class RoutePainter implements Painter<JXMapViewer> {
 
     private List<GeoPosition> route;
@@ -60,7 +57,6 @@ public class RoutePainter implements Painter<JXMapViewer> {
 
         Rectangle2D viewport = map.getViewportBounds();
 
-        // Convert GeoPosition to screen points
         List<Point2D> screenPoints = new ArrayList<>();
         for (GeoPosition pos : route) {
             Point2D worldPt = map.getTileFactory().geoToPixel(pos, map.getZoom());
@@ -69,17 +65,14 @@ public class RoutePainter implements Painter<JXMapViewer> {
             screenPoints.add(new Point2D.Double(screenX, screenY));
         }
 
-        // Draw outline
         g2.setColor(outlineColor);
         g2.setStroke(new BasicStroke(lineWidth + 3, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         drawPolyline(g2, screenPoints);
 
-        // Draw main line
         g2.setColor(routeColor);
         g2.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         drawPolyline(g2, screenPoints);
 
-        // Draw circles at stops
         for (Point2D pt : screenPoints) {
             int size = 10;
             int x = (int) pt.getX() - size / 2;

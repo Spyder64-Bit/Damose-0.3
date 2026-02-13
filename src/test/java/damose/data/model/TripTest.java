@@ -7,9 +7,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Unit tests for Trip model.
- */
 @DisplayName("Trip")
 class TripTest {
 
@@ -17,7 +14,7 @@ class TripTest {
 
     @BeforeEach
     void setUp() {
-        trip = new Trip("64", "SERVICE_A", "TRIP001", "Termini → Colosseo", "64A", 0, "SHAPE001");
+        trip = new Trip("64", "SERVICE_A", "TRIP001", "Termini â†’ Colosseo", "64A", 0, "SHAPE001");
     }
 
     @Nested
@@ -30,7 +27,7 @@ class TripTest {
             assertEquals("64", trip.getRouteId());
             assertEquals("SERVICE_A", trip.getServiceId());
             assertEquals("TRIP001", trip.getTripId());
-            assertEquals("Termini → Colosseo", trip.getTripHeadsign());
+            assertEquals("Termini â†’ Colosseo", trip.getTripHeadsign());
             assertEquals("64A", trip.getTripShortName());
             assertEquals(0, trip.getDirectionId());
             assertEquals("SHAPE001", trip.getShapeId());
@@ -47,7 +44,7 @@ class TripTest {
             String str = trip.toString();
             assertTrue(str.contains("64"));
             assertTrue(str.contains("TRIP001"));
-            assertTrue(str.contains("Termini → Colosseo"));
+            assertTrue(str.contains("Termini â†’ Colosseo"));
         }
     }
 
@@ -71,7 +68,7 @@ class TripTest {
         @Test
         @DisplayName("should not be equal to trip with different tripId")
         void shouldNotBeEqualToTripWithDifferentTripId() {
-            Trip differentTrip = new Trip("64", "SERVICE_A", "TRIP002", "Termini → Colosseo", "64A", 0, "SHAPE001");
+            Trip differentTrip = new Trip("64", "SERVICE_A", "TRIP002", "Termini â†’ Colosseo", "64A", 0, "SHAPE001");
             assertNotEquals(trip, differentTrip);
         }
 

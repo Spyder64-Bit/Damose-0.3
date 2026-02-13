@@ -3,18 +3,11 @@ package damose.data.loader;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Simple CSV parser that handles quoted fields.
- */
 public final class CsvParser {
 
     private CsvParser() {
-        // Utility class
     }
 
-    /**
-     * Parse a CSV line handling quoted fields.
-     */
     public static List<String> parseLine(String line) {
         List<String> result = new ArrayList<>();
         StringBuilder current = new StringBuilder();
@@ -24,7 +17,6 @@ public final class CsvParser {
             char c = line.charAt(i);
 
             if (c == '"') {
-                // Support escaped quotes "" inside a field
                 if (inQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
                     current.append('"');
                     i++;

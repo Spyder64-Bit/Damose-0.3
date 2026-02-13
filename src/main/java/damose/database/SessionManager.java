@@ -1,14 +1,10 @@
 package damose.database;
 
-/**
- * Manages the current user session.
- */
 public final class SessionManager {
 
     private static User currentUser = null;
 
     private SessionManager() {
-        // Utility class
     }
 
     public static void setCurrentUser(User user) {

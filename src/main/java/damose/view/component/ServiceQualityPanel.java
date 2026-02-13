@@ -28,11 +28,6 @@ import javax.swing.border.EmptyBorder;
 import damose.service.ServiceQualityTracker;
 import damose.service.ServiceQualityTracker.ServiceStatus;
 
-/**
- * Panel showing real-time service quality metrics.
- * Usa DotIcon per rendere lo stato come pallino colorato.
- * Bordi arrotondati uniformi.
- */
 public class ServiceQualityPanel extends JPanel {
 
     private static final Color BG_COLOR = new Color(30, 30, 35, 240);
@@ -61,7 +56,6 @@ public class ServiceQualityPanel extends JPanel {
     }
 
     private void initComponents() {
-        // Main compact panel con bordi uniformi
         JPanel mainPanel = new JPanel(new GridBagLayout()) {
             @Override
             protected void paintComponent(Graphics g) {
@@ -90,21 +84,19 @@ public class ServiceQualityPanel extends JPanel {
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // Status: pallino + tooltip descrizione
         statusLabel = createLabel("", 16, true);
-        statusLabel.setPreferredSize(new Dimension(18, 30)); // Reduced height
+        statusLabel.setPreferredSize(new Dimension(18, 30)); // Nota in italiano
         statusLabel.setVerticalAlignment(JLabel.CENTER);
         statusLabel.setHorizontalAlignment(JLabel.CENTER);
         gbc.gridx = 0; gbc.gridy = 0; gbc.gridheight = 2;
-        gbc.fill = GridBagConstraints.NONE; // Don't fill, keep fixed size
+        gbc.fill = GridBagConstraints.NONE; // Nota in italiano
         mainPanel.add(statusLabel, gbc);
 
-        // Vehicle count (solo testo, oppure potresti aggiungere un DotIcon grigio)
         vehicleCountLabel = createLabel("-- Bus", 13, true);
         gbc.gridx = 1; gbc.gridy = 0; gbc.gridheight = 1; 
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.weightx = 1.0; // Allow to expand horizontally
+        gbc.weightx = 1.0; // Nota in italiano
         mainPanel.add(vehicleCountLabel, gbc);
 
         delayLabel = createLabel("-- min", 11, false);
@@ -113,16 +105,14 @@ public class ServiceQualityPanel extends JPanel {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         mainPanel.add(delayLabel, gbc);
 
-        // Mini chart
         vehicleChart = new MiniChart();
         vehicleChart.setPreferredSize(new Dimension(50, 24));
         gbc.gridx = 2; gbc.gridy = 0; gbc.gridheight = 2;
         gbc.insets = new Insets(1, 6, 1, 3);
         gbc.fill = GridBagConstraints.NONE;
-        gbc.weightx = 0.0; // Don't expand
+        gbc.weightx = 0.0; // Nota in italiano
         mainPanel.add(vehicleChart, gbc);
 
-        // Dettagli con bordi uniformi
         detailsPanel = createDetailsPanel();
         detailsPanel.setVisible(false);
 
@@ -172,7 +162,7 @@ public class ServiceQualityPanel extends JPanel {
         panel.add(lastUpdateLabel, gbc);
 
         gbc.gridx = 0; gbc.gridy = 1;
-        panel.add(createLabel("Puntualità:", 10, false), gbc);
+        panel.add(createLabel("PuntualitÃƒÂ :", 10, false), gbc);
 
         JLabel onTimeLabel = createLabel("--%", 10, true);
         gbc.gridx = 1;
@@ -195,23 +185,17 @@ public class ServiceQualityPanel extends JPanel {
         repaint();
     }
 
-    /**
-     * Refresh display with current metrics e status dot.
-     */
     public void refresh() {
         ServiceQualityTracker tracker = ServiceQualityTracker.getInstance();
 
-        // Stato: usa DotIcon con il colore associato
         ServiceStatus status = tracker.getServiceStatus();
         statusLabel.setIcon(new DotIcon(12, status.getColor()));
-        statusLabel.setText(""); // se vuoi nascondere il testo: setText("")
+        statusLabel.setText(""); // Nota in italiano
         statusLabel.setToolTipText(status.getDescription());
 
-        // Veicoli attivi
         int vehicles = tracker.getActiveVehicles();
         vehicleCountLabel.setText(vehicles + " Bus");
 
-        // Ritardo medio
         double avgDelay = tracker.getAverageDelayMinutes();
         if (avgDelay > 0.5) {
             delayLabel.setText(String.format("+%.0f min", avgDelay));
@@ -224,10 +208,8 @@ public class ServiceQualityPanel extends JPanel {
             delayLabel.setForeground(new Color(129, 199, 132));
         }
 
-        // Ultimo aggiornamento
         lastUpdateLabel.setText(tracker.getLastUpdateTime());
 
-        // Chart
         vehicleChart.setData(tracker.getVehicleHistory());
     }
 
@@ -241,9 +223,6 @@ public class ServiceQualityPanel extends JPanel {
         }, 5000, 10000);
     }
 
-    /**
-     * Pallino semplice (come in FloatingArrivalPanel).
-     */
     private static class DotIcon implements Icon {
         private final int size;
         private final Color color;
@@ -258,7 +237,6 @@ public class ServiceQualityPanel extends JPanel {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(color);
-            // Paint in center with proper offset
             g2.fillOval(x + 2, y + 5, size, size);
             g2.dispose();
         }
@@ -267,9 +245,6 @@ public class ServiceQualityPanel extends JPanel {
         @Override public int getIconHeight() { return size + 8; }
     }
 
-    /**
-     * Mini sparkline chart for vehicle count history.
-     */
     private static class MiniChart extends JPanel {
         private List<Integer> data;
 

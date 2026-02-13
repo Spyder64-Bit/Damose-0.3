@@ -9,9 +9,6 @@ import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Unit tests for TripServiceCalendar.
- */
 @DisplayName("TripServiceCalendar")
 class TripServiceCalendarTest {
 
@@ -66,7 +63,7 @@ class TripServiceCalendarTest {
             LocalDate date = LocalDate.of(2024, 12, 5);
             
             calendar.addServiceDate("SERVICE_A", date);
-            calendar.addServiceDate("SERVICE_A", date); // duplicate
+            calendar.addServiceDate("SERVICE_A", date); // Nota in italiano
             
             assertEquals(1, calendar.serviceCount());
             assertTrue(calendar.serviceRunsOnDate("SERVICE_A", date));
@@ -93,7 +90,6 @@ class TripServiceCalendarTest {
         void shouldHandleRemovingNonExistentDate() {
             LocalDate date = LocalDate.of(2024, 12, 5);
             
-            // Should not throw
             assertDoesNotThrow(() -> 
                 calendar.removeServiceDate("SERVICE_A", date)
             );
@@ -196,16 +192,12 @@ class TripServiceCalendarTest {
         @Test
         @DisplayName("should handle weekday service")
         void shouldHandleWeekdayService() {
-            // Add Monday-Friday
-            for (int day = 2; day <= 6; day++) { // Mon=2, Fri=6 in Dec 2024
+            for (int day = 2; day <= 6; day++) { // Nota in italiano
                 calendar.addServiceDate("WEEKDAY", LocalDate.of(2024, 12, day));
             }
             
-            // Monday
             assertTrue(calendar.serviceRunsOnDate("WEEKDAY", LocalDate.of(2024, 12, 2)));
-            // Friday
             assertTrue(calendar.serviceRunsOnDate("WEEKDAY", LocalDate.of(2024, 12, 6)));
-            // Saturday
             assertFalse(calendar.serviceRunsOnDate("WEEKDAY", LocalDate.of(2024, 12, 7)));
         }
 

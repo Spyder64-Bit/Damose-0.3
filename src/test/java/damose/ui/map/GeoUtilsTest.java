@@ -8,9 +8,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Unit tests for GeoUtils.
- */
 @DisplayName("GeoUtils")
 class GeoUtilsTest {
 
@@ -28,7 +25,6 @@ class GeoUtilsTest {
         @Test
         @DisplayName("should calculate correct distance between Rome and Vatican")
         void shouldCalculateDistanceRomeToVatican() {
-            // Rome center to Vatican (~1.5 km)
             double distance = GeoUtils.haversine(41.9028, 12.4964, 41.9029, 12.4534);
             assertTrue(distance > 3.0 && distance < 5.0, 
                 "Distance should be roughly 3-5 km, was: " + distance);
@@ -37,7 +33,6 @@ class GeoUtilsTest {
         @Test
         @DisplayName("should calculate correct distance between Rome and Milan")
         void shouldCalculateDistanceRomeToMilan() {
-            // Rome (41.9028, 12.4964) to Milan (45.4642, 9.1900) - ~480 km
             double distance = GeoUtils.haversine(41.9028, 12.4964, 45.4642, 9.1900);
             assertTrue(distance > 450 && distance < 520, 
                 "Distance should be roughly 480 km, was: " + distance);
@@ -45,19 +40,18 @@ class GeoUtilsTest {
 
         @ParameterizedTest
         @CsvSource({
-            "0.0, 0.0, 0.0, 1.0, 111.0",      // 1 degree longitude at equator ~111 km
-            "0.0, 0.0, 1.0, 0.0, 111.0",      // 1 degree latitude ~111 km
+            "0.0, 0.0, 0.0, 1.0, 111.0", // Nota in italiano
+            "0.0, 0.0, 1.0, 0.0, 111.0", // Nota in italiano
         })
         @DisplayName("should calculate roughly 111 km per degree")
         void shouldCalculate111KmPerDegree(double lat1, double lon1, double lat2, double lon2, double expected) {
             double distance = GeoUtils.haversine(lat1, lon1, lat2, lon2);
-            assertEquals(expected, distance, 5.0); // Allow 5 km tolerance
+            assertEquals(expected, distance, 5.0); // Nota in italiano
         }
 
         @Test
         @DisplayName("should handle negative coordinates")
         void shouldHandleNegativeCoordinates() {
-            // Southern hemisphere
             double distance = GeoUtils.haversine(-33.8688, 151.2093, -37.8136, 144.9631);
             assertTrue(distance > 700 && distance < 800, 
                 "Sydney to Melbourne should be ~700-800 km, was: " + distance);
@@ -92,7 +86,6 @@ class GeoUtilsTest {
     @DisplayName("Distance Calculations for Rome")
     class RomeDistanceTests {
 
-        // Rome coordinates
         private static final double TERMINI_LAT = 41.9010;
         private static final double TERMINI_LON = 12.5010;
         private static final double COLOSSEO_LAT = 41.8902;

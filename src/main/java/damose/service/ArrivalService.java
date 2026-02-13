@@ -7,9 +7,12 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import damose.config.AppConstants;
@@ -22,14 +25,12 @@ import damose.model.TripServiceCalendar;
 import damose.model.TripUpdateRecord;
 import damose.model.ConnectionMode;
 
-/**
- * Service for managing real-time and static arrivals.
- * Handles matching between RT and static data, time calculations and formatting.
- */
 public class ArrivalService {
 
-    // Real-time map: normalizedTripKey -> (stopId -> arrivalEpochSeconds)
     private final Map<String, Map<String, Long>> realtimeArrivals = new HashMap<>();
+    private final Map<String, Map<String, NavigableSet<Long>>> realtimeArrivalsByRoute = new HashMap<>();
+
+    private static final long ROUTE_FALLBACK_MAX_DIFF_SECONDS = 30 * 60;
 
     private final TripMatcher matcher;
     private final StopTripMapper stopTripMapper;
@@ -42,30 +43,47 @@ public class ArrivalService {
         this.tripServiceCalendar = tripServiceCalendar;
     }
 
-    /**
-     * Update RT arrivals map with new data from feed.
-     */
     public void updateRealtimeArrivals(List<TripUpdateRecord> updates) {
         synchronized (realtimeArrivals) {
             realtimeArrivals.clear();
+            realtimeArrivalsByRoute.clear();
             for (TripUpdateRecord u : updates) {
                 String rawFeedTrip = u.getTripId();
-                String normalizedKey = normalizeTripKey(rawFeedTrip);
-                Set<String> variants = TripIdUtils.generateVariants(normalizedKey);
+                Set<String> variants = TripIdUtils.generateVariants(rawFeedTrip);
+                if (variants.isEmpty()) {
+                    String fallback = normalizeTripKey(rawFeedTrip);
+                    if (fallback != null && !fallback.isBlank()) {
+                        variants = Set.of(fallback);
+                    }
+                }
+                if (variants.isEmpty()) {
+                    continue;
+                }
+
+                Set<String> stopVariants = generateStopIdVariants(u.getStopId());
+                if (stopVariants.isEmpty()) {
+                    continue;
+                }
 
                 for (String key : variants) {
-                    realtimeArrivals
-                        .computeIfAbsent(key, k -> new HashMap<>())
-                        .put(u.getStopId(), u.getArrivalEpochSeconds());
+                    Map<String, Long> byStop = realtimeArrivals.computeIfAbsent(key, k -> new HashMap<>());
+                    for (String stopKey : stopVariants) {
+                        byStop.merge(stopKey, u.getArrivalEpochSeconds(), Math::min);
+                    }
+                }
+
+                Set<String> routeVariants = generateRouteIdVariants(u.getRouteId());
+                for (String routeKey : routeVariants) {
+                    Map<String, NavigableSet<Long>> byStop =
+                            realtimeArrivalsByRoute.computeIfAbsent(routeKey, k -> new HashMap<>());
+                    for (String stopKey : stopVariants) {
+                        byStop.computeIfAbsent(stopKey, k -> new TreeSet<>()).add(u.getArrivalEpochSeconds());
+                    }
                 }
             }
         }
     }
 
-    /**
-     * Compute arrivals for a specific stop.
-     * @return List of formatted strings for UI
-     */
     public List<String> computeArrivalsForStop(String stopId, ConnectionMode mode, long currentFeedTs) {
         List<StopTime> times = stopTripMapper.getStopTimesForStop(stopId);
         if (times == null || times.isEmpty()) {
@@ -83,7 +101,6 @@ public class ArrivalService {
             if (trip == null) continue;
             String routeId = trip.getRouteId();
 
-            // Check active service
             String serviceId = trip.getServiceId();
             if (serviceId != null && !serviceId.isEmpty()) {
                 if (!tripServiceCalendar.serviceRunsOnDate(serviceId, feedDate)) {
@@ -91,7 +108,6 @@ public class ArrivalService {
                 }
             }
 
-            // Static schedule
             LocalTime arr = st.getArrivalTime();
             if (arr == null) continue;
 
@@ -101,12 +117,10 @@ public class ArrivalService {
             long staticDiffMin = (scheduledEpoch - nowEpoch) / 60;
             if (staticDiffMin < -2 || staticDiffMin > AppConstants.STATIC_WINDOW_MIN) continue;
 
-            // RT prediction
             Long predictedEpoch = (mode == ConnectionMode.ONLINE) 
-                ? lookupRealtimeArrivalEpochStrictByStop(st, stopId) 
+                ? lookupRealtimeArrivalEpochStrictByStop(st, stopId, routeId, scheduledEpoch) 
                 : null;
 
-            // Sanity check on RT prediction
             if (predictedEpoch != null) {
                 long rtDiffMin = (predictedEpoch - nowEpoch) / 60;
                 if (rtDiffMin < -2 || rtDiffMin > AppConstants.RT_WINDOW_MIN) {
@@ -145,10 +159,6 @@ public class ArrivalService {
         return arrivi;
     }
     
-    /**
-     * Get all trips passing through a stop for the entire day.
-     * @return List of formatted strings with trip info
-     */
     public List<String> getAllTripsForStopToday(String stopId, ConnectionMode mode, long currentFeedTs) {
         List<StopTime> times = stopTripMapper.getStopTimesForStop(stopId);
         if (times == null || times.isEmpty()) {
@@ -166,7 +176,6 @@ public class ArrivalService {
             
             String routeId = trip.getRouteId();
 
-            // Check active service
             String serviceId = trip.getServiceId();
             if (serviceId != null && !serviceId.isEmpty()) {
                 if (!tripServiceCalendar.serviceRunsOnDate(serviceId, feedDate)) {
@@ -180,16 +189,14 @@ public class ArrivalService {
             long scheduledEpoch = computeScheduledEpochForFeed(st, currentFeedTs);
             if (scheduledEpoch <= 0) continue;
 
-            // RT prediction
             Long predictedEpoch = (mode == ConnectionMode.ONLINE) 
-                ? lookupRealtimeArrivalEpochStrictByStop(st, stopId) 
+                ? lookupRealtimeArrivalEpochStrictByStop(st, stopId, routeId, scheduledEpoch) 
                 : null;
 
             allTrips.add(new TripArrivalInfo(routeId, trip.getTripHeadsign(), 
                 arr, scheduledEpoch, predictedEpoch));
         }
 
-        // Sort by scheduled time
         allTrips.sort(Comparator.comparing(t -> t.arrivalTime));
 
         List<String> result = new ArrayList<>();
@@ -207,7 +214,6 @@ public class ArrivalService {
         String timeStr = String.format("%02d:%02d", info.arrivalTime.getHour(), info.arrivalTime.getMinute());
         String headsign = (info.headsign != null && !info.headsign.isEmpty()) ? info.headsign : "";
         
-        // Truncate long headsigns to prevent panel overflow
         if (headsign.length() > 30) {
             headsign = headsign.substring(0, 27) + "...";
         }
@@ -225,9 +231,6 @@ public class ArrivalService {
         }
     }
     
-    /**
-     * Info about a single trip arrival.
-     */
     private static class TripArrivalInfo {
         final String routeId;
         final String headsign;
@@ -249,7 +252,6 @@ public class ArrivalService {
         long now = Instant.now().getEpochSecond();
         
         if (info.predictedEpoch != null) {
-            // RT mode: use predicted epoch
             long diffFromNowMin = Math.max(0, (info.predictedEpoch - now) / 60);
             long delayMin = (info.predictedEpoch - info.scheduledEpoch) / 60;
             String status;
@@ -263,50 +265,85 @@ public class ArrivalService {
                 return info.routeId + " - " + diffFromNowMin + " min (" + status + ")";
             }
         } else {
-            // Static mode: use scheduledEpoch (not LocalTime) for consistency
             long diffStaticMin = Math.max(0, (info.scheduledEpoch - now) / 60);
             
             if (diffStaticMin <= AppConstants.IN_ARRIVO_THRESHOLD_MIN) {
-                return info.routeId + " - In arrivo (statico)";
+                return info.routeId + " - In arrivo";
             } else {
-                return info.routeId + " - " + diffStaticMin + " min (statico)";
+                return info.routeId + " - " + diffStaticMin + " min";
             }
         }
     }
 
-    private Long lookupRealtimeArrivalEpochStrictByStop(StopTime st, String stopId) {
+    private Long lookupRealtimeArrivalEpochStrictByStop(StopTime st, String stopId,
+                                                        String routeId, long scheduledEpoch) {
         String rawStaticTrip = st.getTripId();
         String normalizedStaticKey = normalizeTripKey(rawStaticTrip);
         Set<String> staticVariants = TripIdUtils.generateVariants(normalizedStaticKey);
+        Set<String> stopVariants = generateStopIdVariants(stopId);
 
         synchronized (realtimeArrivals) {
-            // Direct match on variants and exact stopId
             for (String v : staticVariants) {
                 Map<String, Long> byStop = realtimeArrivals.get(v);
                 if (byStop == null) continue;
-                Long direct = byStop.get(stopId);
-                if (direct != null) {
-                    return direct;
+                for (String stopVariant : stopVariants) {
+                    Long direct = byStop.get(stopVariant);
+                    if (direct != null) {
+                        return direct;
+                    }
                 }
             }
 
-            // Fuzzy: search RT keys that contain static variant
             for (String key : realtimeArrivals.keySet()) {
                 for (String v : staticVariants) {
                     if (key == null || v == null) continue;
                     if (key.contains(v) || key.endsWith(v)) {
                         Map<String, Long> candidate = realtimeArrivals.get(key);
                         if (candidate == null) continue;
-                        Long cand = candidate.get(stopId);
-                        if (cand != null) {
-                            return cand;
+                        for (String stopVariant : stopVariants) {
+                            Long cand = candidate.get(stopVariant);
+                            if (cand != null) {
+                                return cand;
+                            }
                         }
                     }
                 }
             }
 
+            Set<String> routeVariants = generateRouteIdVariants(routeId);
+            Long bestRouteFallback = null;
+            long bestDiff = Long.MAX_VALUE;
+            for (String routeVariant : routeVariants) {
+                Map<String, NavigableSet<Long>> byStop = realtimeArrivalsByRoute.get(routeVariant);
+                if (byStop == null) continue;
+                for (String stopVariant : stopVariants) {
+                    NavigableSet<Long> epochs = byStop.get(stopVariant);
+                    Long candidate = pickClosestEpoch(epochs, scheduledEpoch);
+                    if (candidate == null) {
+                        continue;
+                    }
+                    long diff = Math.abs(candidate - scheduledEpoch);
+                    if (diff < bestDiff) {
+                        bestDiff = diff;
+                        bestRouteFallback = candidate;
+                    }
+                }
+            }
+            if (bestRouteFallback != null && bestDiff <= ROUTE_FALLBACK_MAX_DIFF_SECONDS) {
+                return bestRouteFallback;
+            }
+
             return null;
         }
+    }
+
+    private Long pickClosestEpoch(NavigableSet<Long> epochs, long targetEpoch) {
+        if (epochs == null || epochs.isEmpty()) return null;
+        Long floor = epochs.floor(targetEpoch);
+        Long ceil = epochs.ceiling(targetEpoch);
+        if (floor == null) return ceil;
+        if (ceil == null) return floor;
+        return Math.abs(targetEpoch - floor) <= Math.abs(ceil - targetEpoch) ? floor : ceil;
     }
 
     private String normalizeTripKey(String rawTripId) {
@@ -316,6 +353,82 @@ public class ArrivalService {
             simple = simple.trim();
         }
         return simple;
+    }
+
+    private Set<String> generateStopIdVariants(String rawStopId) {
+        Set<String> out = new HashSet<>();
+        if (rawStopId == null) return out;
+
+        String trimmed = rawStopId.trim();
+        if (trimmed.isEmpty()) return out;
+
+        out.add(trimmed);
+
+        String normalized = normalizeStopIdForMatch(trimmed);
+        if (normalized != null && !normalized.isEmpty()) {
+            out.add(normalized);
+        }
+
+        String digitsOnly = trimmed.replaceAll("\\D", "");
+        if (digitsOnly.length() >= 4) {
+            out.add(digitsOnly);
+        }
+
+        if (normalized != null) {
+            String normDigits = normalized.replaceAll("\\D", "");
+            if (normDigits.length() >= 4) {
+                out.add(normDigits);
+            }
+        }
+
+        return out;
+    }
+
+    private String normalizeStopIdForMatch(String rawStopId) {
+        if (rawStopId == null) return null;
+        String s = rawStopId.trim();
+        if (s.isEmpty()) return null;
+
+        while (true) {
+            String lower = s.toLowerCase();
+            if (lower.startsWith("stop:")) {
+                s = s.substring("stop:".length()).trim();
+                continue;
+            }
+            int colon = s.indexOf(':');
+            if (colon > 0 && colon < 6) {
+                s = s.substring(colon + 1).trim();
+                continue;
+            }
+            break;
+        }
+
+        s = s.replaceFirst("^\\d+#", "");
+        s = s.replaceFirst("[_:]\\d+$", "");
+        return s.trim();
+    }
+
+    private Set<String> generateRouteIdVariants(String rawRouteId) {
+        Set<String> out = new HashSet<>();
+        if (rawRouteId == null) return out;
+
+        String trimmed = rawRouteId.trim();
+        if (trimmed.isEmpty()) return out;
+        out.add(trimmed);
+
+        String upper = trimmed.toUpperCase();
+        out.add(upper);
+
+        String lower = trimmed.toLowerCase();
+        if (lower.startsWith("route:")) {
+            String bare = trimmed.substring("route:".length()).trim();
+            if (!bare.isEmpty()) {
+                out.add(bare);
+                out.add(bare.toUpperCase());
+            }
+        }
+
+        return out;
     }
 
     private long computeScheduledEpochForFeed(StopTime st, long feedEpochSeconds) {
@@ -339,9 +452,6 @@ public class ArrivalService {
         return best;
     }
 
-    /**
-     * Info about an arrival for a specific route.
-     */
     private static class RouteArrivalInfo {
         final String routeId;
         final long scheduledEpoch;
