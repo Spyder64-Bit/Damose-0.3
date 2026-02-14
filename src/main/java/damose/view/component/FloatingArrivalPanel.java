@@ -64,6 +64,8 @@ public class FloatingArrivalPanel extends JPanel {
     private static final Font TITLE_FONT = new Font("SansSerif", Font.BOLD, 16);
     private static final Font ARRIVAL_FONT = new Font("SansSerif", Font.PLAIN, 14);
     private static final Font SMALL_FONT = new Font("SansSerif", Font.PLAIN, 12);
+    private static final int MAX_PANEL_HEIGHT = 420;
+    private static final int MIN_SCROLL_HEIGHT = 60;
 
     public FloatingArrivalPanel() {
         setLayout(null);
@@ -324,16 +326,22 @@ public class FloatingArrivalPanel extends JPanel {
     }
     
     private void applyPanelSize(int contentHeight, int scrollHeight) {
-        content.setBounds(0, 0, AppConstants.FLOATING_PANEL_WIDTH, contentHeight);
+        int fixedSectionHeight = Math.max(0, contentHeight - scrollHeight);
+        int maxHeight = resolvePanelMaxHeight();
+        int maxScrollHeight = Math.max(MIN_SCROLL_HEIGHT, maxHeight - fixedSectionHeight);
+        int clampedScrollHeight = Math.min(Math.max(scrollHeight, MIN_SCROLL_HEIGHT), maxScrollHeight);
+        int clampedContentHeight = fixedSectionHeight + clampedScrollHeight;
+
+        content.setBounds(0, 0, AppConstants.FLOATING_PANEL_WIDTH, clampedContentHeight);
         scrollPane.setPreferredSize(new Dimension(
                 AppConstants.FLOATING_PANEL_WIDTH - 28, 
-                scrollHeight));
+                clampedScrollHeight));
         scrollPane.setMaximumSize(new Dimension(
                 AppConstants.FLOATING_PANEL_WIDTH - 28, 
-                scrollHeight));
+                clampedScrollHeight));
         
-        setPreferredSize(new Dimension(AppConstants.FLOATING_PANEL_WIDTH, contentHeight));
-        setSize(AppConstants.FLOATING_PANEL_WIDTH, contentHeight);
+        setPreferredSize(new Dimension(AppConstants.FLOATING_PANEL_WIDTH, clampedContentHeight));
+        setSize(AppConstants.FLOATING_PANEL_WIDTH, clampedContentHeight);
         
         content.revalidate();
         content.repaint();
@@ -344,6 +352,14 @@ public class FloatingArrivalPanel extends JPanel {
             getParent().revalidate();
             getParent().repaint();
         }
+    }
+
+    private int resolvePanelMaxHeight() {
+        if (getParent() == null) {
+            return MAX_PANEL_HEIGHT;
+        }
+        int parentHeightCap = Math.max(220, getParent().getHeight() - 20);
+        return Math.min(MAX_PANEL_HEIGHT, parentHeightCap);
     }
     
     private void loadStarIcons() {

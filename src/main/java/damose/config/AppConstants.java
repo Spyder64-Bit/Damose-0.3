@@ -50,6 +50,9 @@ public final class AppConstants {
 
     public static final Color PANEL_BG = new Color(35, 35, 35);
     public static final Color PANEL_BORDER = new Color(60, 60, 60);
+    public static final Color OVERLAY_CARD_BG = new Color(30, 30, 35, 235);
+    public static final Color OVERLAY_CARD_BORDER = new Color(60, 60, 70, 220);
+    public static final int OVERLAY_CARD_ARC = 16;
 
     public static final Font FONT_TITLE = new Font("Segoe UI", Font.BOLD, 22);
     public static final Font FONT_SUBTITLE = new Font("Segoe UI", Font.PLAIN, 14);

@@ -24,6 +24,7 @@ import damose.model.Stop;
 import damose.model.Trip;
 import damose.model.VehiclePosition;
 import damose.model.BusWaypoint;
+import damose.model.VehicleType;
 import damose.view.render.RoutePainter;
 
 public class MapOverlayManager {
@@ -42,6 +43,7 @@ public class MapOverlayManager {
     private static List<Trip> indexedTripsRef = null;
     
     private static String busRouteFilter = null;
+    private static Integer busDirectionFilter = null;
     
     private static boolean busesVisible = true;
 
@@ -51,6 +53,8 @@ public class MapOverlayManager {
     
     private static Image busIcon;
     private static Image busIconSmall;
+    private static Image tramIcon;
+    private static Image tramIconSmall;
     private static Image stopIcon;
     private static Image stopIconSmall;
 
@@ -64,6 +68,14 @@ public class MapOverlayManager {
             busIconSmall = bus.getImage().getScaledInstance(26, 26, Image.SCALE_SMOOTH);
         } catch (Exception e) {
             System.out.println("Failed to load bus icon: " + e.getMessage());
+        }
+
+        try {
+            ImageIcon tram = new ImageIcon(MapOverlayManager.class.getResource("/sprites/tram.png"));
+            tramIcon = tram.getImage().getScaledInstance(40, 40, Image.SCALE_SMOOTH);
+            tramIconSmall = tram.getImage().getScaledInstance(26, 26, Image.SCALE_SMOOTH);
+        } catch (Exception e) {
+            System.out.println("Failed to load tram icon: " + e.getMessage());
         }
         
         try {
@@ -144,7 +156,6 @@ public class MapOverlayManager {
         Rectangle2D viewport = map.getViewportBounds();
         int zoom = map.getZoom();
         
-        Image icon = (zoom > 5) ? busIconSmall : busIcon;
         int size = (zoom > 5) ? 26 : 40;
         
         for (BusWaypoint wp : busWaypoints) {
@@ -155,6 +166,9 @@ public class MapOverlayManager {
                     continue;
                 }
             }
+            if (busDirectionFilter != null && wp.getDirectionId() != busDirectionFilter) {
+                continue;
+            }
             
             Point2D worldPt = map.getTileFactory().geoToPixel(wp.getPosition(), zoom);
             int screenX = (int) (worldPt.getX() - viewport.getX());
@@ -164,16 +178,28 @@ public class MapOverlayManager {
                 screenY < -size || screenY > map.getHeight() + size) {
                 continue;
             }
+
+            Image icon = getVehicleIcon(wp.getVehicleType(), zoom);
             
             if (icon != null) {
                 g.drawImage(icon, screenX - size / 2, screenY - size / 2, null);
             } else {
-                g.setColor(new Color(0, 120, 255));
+                g.setColor(wp.getVehicleType() == VehicleType.TRAM
+                        ? new Color(255, 140, 0)
+                        : new Color(0, 120, 255));
                 g.fillOval(screenX - size / 2, screenY - size / 2, size, size);
                 g.setColor(Color.WHITE);
                 g.drawOval(screenX - size / 2, screenY - size / 2, size, size);
             }
         }
+    }
+
+    private static Image getVehicleIcon(VehicleType type, int zoom) {
+        boolean small = zoom > 5;
+        if (type == VehicleType.TRAM) {
+            return small ? tramIconSmall : tramIcon;
+        }
+        return small ? busIconSmall : busIcon;
     }
     
     public static void setBusRouteFilter(String routeId) {
@@ -187,6 +213,20 @@ public class MapOverlayManager {
     
     public static void clearBusRouteFilter() {
         setBusRouteFilter(null);
+        setBusDirectionFilter(null);
+    }
+
+    public static void setBusDirectionFilter(Integer directionId) {
+        synchronized (lock) {
+            busDirectionFilter = directionId;
+        }
+        if (currentMap != null) {
+            currentMap.repaint();
+        }
+    }
+
+    public static void clearBusDirectionFilter() {
+        setBusDirectionFilter(null);
     }
     
     public static void setBusesVisible(boolean visible) {
@@ -243,7 +283,8 @@ public class MapOverlayManager {
                 Trip trip = findTrip(vp.getTripId());
                 String headsign = (trip != null) ? trip.getTripHeadsign() : vp.getTripId();
                 String routeId = (trip != null) ? trip.getRouteId() : null;
-                newBusWaypoints.add(new BusWaypoint(vp, headsign, routeId));
+                int directionId = (trip != null) ? trip.getDirectionId() : -1;
+                newBusWaypoints.add(new BusWaypoint(vp, headsign, routeId, directionId));
                 if (vp.getVehicleId() != null) {
                     newBusIds.add(vp.getVehicleId());
                 }

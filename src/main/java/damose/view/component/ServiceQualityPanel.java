@@ -25,16 +25,17 @@ import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 
+import damose.config.AppConstants;
 import damose.service.ServiceQualityTracker;
 import damose.service.ServiceQualityTracker.ServiceStatus;
 
 public class ServiceQualityPanel extends JPanel {
 
-    private static final Color BG_COLOR = new Color(30, 30, 35, 240);
-    private static final Color BORDER_COLOR = new Color(60, 60, 70);
+    private static final Color BG_COLOR = AppConstants.OVERLAY_CARD_BG;
+    private static final Color BORDER_COLOR = AppConstants.OVERLAY_CARD_BORDER;
     private static final Color TEXT_PRIMARY = new Color(240, 240, 245);
     private static final Color TEXT_SECONDARY = new Color(160, 160, 170);
-    private static final int CORNER_ARC = 16;
+    private static final int CORNER_ARC = AppConstants.OVERLAY_CARD_ARC;
 
     private JLabel statusLabel;
     private JLabel vehicleCountLabel;
@@ -137,7 +138,7 @@ public class ServiceQualityPanel extends JPanel {
                 int w = getWidth();
                 int h = getHeight();
 
-                g2.setColor(new Color(25, 25, 30, 240));
+                g2.setColor(BG_COLOR);
                 g2.fillRoundRect(0, 0, w, h, CORNER_ARC, CORNER_ARC);
 
                 g2.setColor(BORDER_COLOR);

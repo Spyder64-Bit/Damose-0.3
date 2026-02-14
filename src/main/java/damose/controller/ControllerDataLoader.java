@@ -24,7 +24,7 @@ public final class ControllerDataLoader {
         List<Stop> stops = StopsLoader.load();
         List<Trip> trips = TripsLoader.load();
         List<StopTime> stopTimes = StopTimesLoader.load();
-        RoutesLoader.load(); // Nota in italiano
+        RoutesLoader.load(); 
 
         System.out.println("Stops loaded: " + (stops == null ? 0 : stops.size()));
         System.out.println("Trips loaded: " + (trips == null ? 0 : trips.size()));

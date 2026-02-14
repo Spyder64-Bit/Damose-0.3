@@ -32,13 +32,15 @@ public final class RealtimeUpdateScheduler {
                       StopTripMapper stopTripMapper,
                       ArrivalService arrivalService,
                       Supplier<ConnectionMode> modeSupplier,
-                      Consumer<Long> feedTimestampConsumer) {
+                      Consumer<Long> feedTimestampConsumer,
+                      Consumer<List<VehiclePosition>> vehiclePositionsConsumer) {
         stop();
         timer = new Timer("realtime-updates", true);
         timer.scheduleAtFixedRate(new java.util.TimerTask() {
             @Override
             public void run() {
-                runCycle(view, trips, stopTripMapper, arrivalService, modeSupplier, feedTimestampConsumer);
+                runCycle(view, trips, stopTripMapper, arrivalService, modeSupplier,
+                        feedTimestampConsumer, vehiclePositionsConsumer);
             }
         }, 0, 30_000);
     }
@@ -50,7 +52,8 @@ public final class RealtimeUpdateScheduler {
         }
     }
 
-    public void refreshMapOverlay(MainView view, List<Trip> trips, ConnectionMode mode) {
+    public void refreshMapOverlay(MainView view, List<Trip> trips, ConnectionMode mode,
+                                  Consumer<List<VehiclePosition>> vehiclePositionsConsumer) {
         List<VehiclePosition> positions = Collections.emptyList();
 
         if (mode == ConnectionMode.ONLINE) {
@@ -65,8 +68,12 @@ public final class RealtimeUpdateScheduler {
         }
 
         final List<VehiclePosition> busPositions = positions;
-        SwingUtilities.invokeLater(() -> MapOverlayManager.updateMap(
-                view.getMapViewer(), Collections.emptyList(), busPositions, trips));
+        SwingUtilities.invokeLater(() -> {
+            MapOverlayManager.updateMap(view.getMapViewer(), Collections.emptyList(), busPositions, trips);
+            if (vehiclePositionsConsumer != null) {
+                vehiclePositionsConsumer.accept(busPositions);
+            }
+        });
     }
 
     private void runCycle(MainView view,
@@ -74,7 +81,8 @@ public final class RealtimeUpdateScheduler {
                           StopTripMapper stopTripMapper,
                           ArrivalService arrivalService,
                           Supplier<ConnectionMode> modeSupplier,
-                          Consumer<Long> feedTimestampConsumer) {
+                          Consumer<Long> feedTimestampConsumer,
+                          Consumer<List<VehiclePosition>> vehiclePositionsConsumer) {
         GtfsRealtime.FeedMessage tuFeed = RealtimeService.getLatestTripUpdates();
         GtfsRealtime.FeedMessage vpFeed = RealtimeService.getLatestVehiclePositions();
 
@@ -116,8 +124,12 @@ public final class RealtimeUpdateScheduler {
         }
 
         final List<VehiclePosition> busPositions = computedPositions;
-        SwingUtilities.invokeLater(() -> MapOverlayManager.updateMap(
-                view.getMapViewer(), Collections.emptyList(), busPositions, trips));
+        SwingUtilities.invokeLater(() -> {
+            MapOverlayManager.updateMap(view.getMapViewer(), Collections.emptyList(), busPositions, trips);
+            if (vehiclePositionsConsumer != null) {
+                vehiclePositionsConsumer.accept(busPositions);
+            }
+        });
     }
 }
 

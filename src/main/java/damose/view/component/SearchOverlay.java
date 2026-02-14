@@ -34,6 +34,7 @@ import javax.swing.event.DocumentListener;
 
 import damose.config.AppConstants;
 import damose.model.Stop;
+import damose.model.VehicleType;
 import damose.service.FavoritesService;
 
 public class SearchOverlay extends JPanel {
@@ -127,7 +128,9 @@ public class SearchOverlay extends JPanel {
             @Override
             public void keyPressed(KeyEvent e) {
                 int code = e.getKeyCode();
-                if (code == KeyEvent.VK_ESCAPE) {
+                if (shouldSuppressDeleteBeep(code)) {
+                    e.consume();
+                } else if (code == KeyEvent.VK_ESCAPE) {
                     closeOverlay();
                 } else if (code == KeyEvent.VK_ENTER) {
                     e.consume();
@@ -176,6 +179,10 @@ public class SearchOverlay extends JPanel {
                 } else if (e.getKeyCode() == KeyEvent.VK_F) {
                     e.consume();
                     toggleSelectedFavorite();
+                } else if (e.getKeyCode() == KeyEvent.VK_DELETE
+                        || e.getKeyCode() == KeyEvent.VK_BACK_SPACE) {
+                    // Prevent default list beep on unsupported delete actions.
+                    e.consume();
                 }
             }
         });
@@ -260,22 +267,82 @@ public class SearchOverlay extends JPanel {
             case FAVORITES -> favoriteStops;
         };
         
-        int count = 0;
         int limit = (currentMode == SearchMode.FAVORITES) ? 100 : 50;
-
+        List<Stop> matches = new ArrayList<>();
         for (Stop s : source) {
-            if (count >= limit) break;
             String name = s.getStopName().toLowerCase();
             String id = s.getStopId().toLowerCase();
             if (query.isEmpty() || name.contains(query) || id.contains(query)) {
-                listModel.addElement(s);
-                count++;
+                matches.add(s);
             }
+        }
+
+        if (currentMode == SearchMode.LINES && !query.isEmpty()) {
+            matches.sort((a, b) -> compareLineResults(a, b, query));
+        }
+
+        for (int i = 0; i < Math.min(limit, matches.size()); i++) {
+            listModel.addElement(matches.get(i));
         }
 
         if (!listModel.isEmpty()) {
             resultList.setSelectedIndex(0);
         }
+    }
+
+    private static int compareLineResults(Stop a, Stop b, String query) {
+        int scoreA = lineMatchScore(a, query);
+        int scoreB = lineMatchScore(b, query);
+        if (scoreA != scoreB) {
+            return Integer.compare(scoreA, scoreB);
+        }
+
+        String idA = a.getStopId() == null ? "" : a.getStopId().trim();
+        String idB = b.getStopId() == null ? "" : b.getStopId().trim();
+        if (idA.length() != idB.length()) {
+            return Integer.compare(idA.length(), idB.length());
+        }
+
+        int idCmp = String.CASE_INSENSITIVE_ORDER.compare(idA, idB);
+        if (idCmp != 0) {
+            return idCmp;
+        }
+
+        String nameA = a.getStopName() == null ? "" : a.getStopName().trim();
+        String nameB = b.getStopName() == null ? "" : b.getStopName().trim();
+        return String.CASE_INSENSITIVE_ORDER.compare(nameA, nameB);
+    }
+
+    private static int lineMatchScore(Stop line, String query) {
+        String q = query == null ? "" : query.trim().toLowerCase();
+        String id = line.getStopId() == null ? "" : line.getStopId().trim().toLowerCase();
+        String name = line.getStopName() == null ? "" : line.getStopName().trim().toLowerCase();
+        if (q.isEmpty()) return 99;
+
+        String normalizedQ = normalizeNumericToken(q);
+        String normalizedId = normalizeNumericToken(id);
+
+        if (id.equals(q)) return 0;
+        if (!normalizedQ.isEmpty() && normalizedId.equals(normalizedQ)) return 1;
+        if (id.startsWith(q)) return 2;
+        if (id.contains(q)) return 3;
+        if (name.startsWith(q)) return 4;
+        if (name.contains(q)) return 5;
+        return 6;
+    }
+
+    private static String normalizeNumericToken(String value) {
+        if (value == null || value.isEmpty()) return "";
+        for (int i = 0; i < value.length(); i++) {
+            if (!Character.isDigit(value.charAt(i))) {
+                return value;
+            }
+        }
+        int i = 0;
+        while (i < value.length() - 1 && value.charAt(i) == '0') {
+            i++;
+        }
+        return value.substring(i);
     }
 
     private void moveSelection(int delta) {
@@ -317,6 +384,25 @@ public class SearchOverlay extends JPanel {
 
     private void closeOverlay() {
         setVisible(false);
+    }
+
+    private boolean shouldSuppressDeleteBeep(int keyCode) {
+        if (keyCode != KeyEvent.VK_BACK_SPACE && keyCode != KeyEvent.VK_DELETE) {
+            return false;
+        }
+
+        int selStart = searchField.getSelectionStart();
+        int selEnd = searchField.getSelectionEnd();
+        if (selEnd > selStart) {
+            return false;
+        }
+
+        int caret = searchField.getCaretPosition();
+        int len = searchField.getDocument().getLength();
+        if (keyCode == KeyEvent.VK_BACK_SPACE) {
+            return caret <= 0;
+        }
+        return caret >= len;
     }
 
     public void setData(List<Stop> stops, List<Stop> lines) {
@@ -397,8 +483,11 @@ public class SearchOverlay extends JPanel {
     private class StopCellRenderer extends JPanel implements ListCellRenderer<Stop> {
         private final JLabel nameLabel;
         private final JLabel idLabel;
+        private final JLabel typeLabel;
         private final JLabel starLabel;
         private ImageIcon yellowStarIcon;
+        private final ImageIcon busTypeIcon;
+        private final ImageIcon tramTypeIcon;
 
         public StopCellRenderer() {
             setLayout(new BorderLayout());
@@ -406,6 +495,13 @@ public class SearchOverlay extends JPanel {
             setOpaque(true);
             
             yellowStarIcon = new ImageIcon(createYellowStar(16));
+            busTypeIcon = loadTypeIcon("/sprites/bus.png");
+            tramTypeIcon = loadTypeIcon("/sprites/tram.png");
+
+            typeLabel = new JLabel();
+            typeLabel.setBorder(new EmptyBorder(0, 0, 0, 8));
+            typeLabel.setPreferredSize(new Dimension(22, 22));
+            add(typeLabel, BorderLayout.WEST);
 
             JPanel textPanel = new JPanel();
             textPanel.setOpaque(false);
@@ -427,6 +523,16 @@ public class SearchOverlay extends JPanel {
             starLabel.setBorder(new EmptyBorder(0, 8, 0, 4));
             starLabel.setPreferredSize(new Dimension(24, 24));
             add(starLabel, BorderLayout.EAST);
+        }
+
+        private ImageIcon loadTypeIcon(String path) {
+            try {
+                ImageIcon raw = new ImageIcon(getClass().getResource(path));
+                Image scaled = raw.getImage().getScaledInstance(18, 18, Image.SCALE_SMOOTH);
+                return new ImageIcon(scaled);
+            } catch (Exception e) {
+                return null;
+            }
         }
         
         private Image createYellowStar(int size) {
@@ -469,10 +575,14 @@ public class SearchOverlay extends JPanel {
             
             boolean isFavorite;
             if (value.isFakeLine()) {
-                idLabel.setText("Linea bus");
+                VehicleType vehicleType = VehicleType.fromGtfsCode(value.getStopCode());
+                boolean isTram = vehicleType == VehicleType.TRAM;
+                idLabel.setText(isTram ? "Linea tram" : "Linea bus");
+                typeLabel.setIcon(isTram ? tramTypeIcon : busTypeIcon);
                 isFavorite = FavoritesService.isLineFavorite(value.getStopId());
             } else {
                 idLabel.setText("Stop ID: " + value.getStopId());
+                typeLabel.setIcon(null);
                 isFavorite = FavoritesService.isFavorite(value.getStopId());
             }
             

@@ -40,11 +40,14 @@ import damose.database.UserService;
 
 public class LoginDialog extends JFrame {
 
+    private static final String SWITCH_TO_REGISTER_TEXT = "Non hai ancora un account? Registrati";
+    private static final String SWITCH_TO_LOGIN_TEXT = "Hai gi\u00E0 un account? Accedi";
+
     private JTextField usernameField;
     private JPasswordField passwordField;
     private JPasswordField confirmPasswordField;
     private JTextField emailField;
-    private JLabel confirmLabel, emailLabel, messageLabel;
+    private JLabel confirmLabel, emailLabel, messageLabel, subtitleLabel;
     private JButton actionButton, switchModeButton;
     private JPanel mainPanel;
 
@@ -148,7 +151,7 @@ public class LoginDialog extends JFrame {
         contentPanel.add(titleRow);
         contentPanel.add(Box.createVerticalStrut(8));
 
-        JLabel subtitleLabel = new JLabel("Accedi al tuo account");
+        subtitleLabel = new JLabel("Accedi al tuo account");
         subtitleLabel.setFont(AppConstants.FONT_SUBTITLE);
         subtitleLabel.setForeground(AppConstants.TEXT_SECONDARY);
         subtitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -197,7 +200,7 @@ public class LoginDialog extends JFrame {
         contentPanel.add(actionButton);
         contentPanel.add(Box.createVerticalStrut(12));
 
-        switchModeButton = createLinkButton("Non hai un account? Registrati");
+        switchModeButton = createLinkButton(SWITCH_TO_REGISTER_TEXT);
         switchModeButton.addActionListener(e -> toggleMode());
         contentPanel.add(switchModeButton);
         contentPanel.add(Box.createVerticalStrut(8));
@@ -377,7 +380,8 @@ public class LoginDialog extends JFrame {
         emailLabel.setVisible(!isLoginMode);
         emailField.setVisible(!isLoginMode);
         actionButton.setText(isLoginMode ? "Accedi" : "Registrati");
-        switchModeButton.setText(isLoginMode ? "Non hai un account? Registrati" : "Hai giÃƒÂ  un account? Accedi");
+        switchModeButton.setText(isLoginMode ? SWITCH_TO_REGISTER_TEXT : SWITCH_TO_LOGIN_TEXT);
+        subtitleLabel.setText(isLoginMode ? "Accedi al tuo account" : "Crea un nuovo account");
         messageLabel.setText(" ");
 
         int newHeight = isLoginMode ? 540 : 680;
@@ -413,7 +417,7 @@ public class LoginDialog extends JFrame {
                 toggleMode();
                 usernameField.setText(username);
             } else {
-                showError("Username giÃƒÂ  in uso");
+                showError("Username gi\u00E0 in uso");
             }
         }
     }

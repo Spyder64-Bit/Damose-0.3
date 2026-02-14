@@ -3,10 +3,13 @@ package damose.view;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.MediaTracker;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
@@ -17,6 +20,8 @@ import java.awt.geom.RoundRectangle2D;
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.IntConsumer;
 
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
@@ -32,11 +37,15 @@ import damose.config.AppConstants;
 import damose.model.Stop;
 import damose.view.component.ConnectionButton;
 import damose.view.component.FloatingArrivalPanel;
+import damose.view.component.RouteSidePanel;
 import damose.view.component.SearchOverlay;
 import damose.view.component.ServiceQualityPanel;
 import damose.view.map.GeoUtils;
 import damose.view.map.MapFactory;
 
+/**
+ * Main application view - Midnight Dark style.
+ */
 public class MainView {
 
     private JFrame frame;
@@ -47,10 +56,12 @@ public class MainView {
     private JButton maxButton;
     private JButton minButton;
     private JButton busToggleButton;
+    private JPanel mapControlsPanel;
     private ConnectionButton connectionButton;
     private SearchOverlay searchOverlay;
     private JPanel overlayPanel;
     private FloatingArrivalPanel floatingPanel;
+    private RouteSidePanel routeSidePanel;
     private GeoPosition floatingAnchorGeo;
     private ServiceQualityPanel serviceQualityPanel;
     private List<Stop> allStopsCache = new ArrayList<>();
@@ -58,7 +69,17 @@ public class MainView {
 
     private Point dragOffset;
     private boolean isDragging = false;
-    private Rectangle normalBounds = new Rectangle(100, 100, 1100, 750); // Nota in italiano
+    private Rectangle normalBounds = new Rectangle(100, 100, 1100, 750); // Store normal window bounds
+    private static final int LEFT_STACK_X = 10;
+    private static final int LEFT_STACK_Y = 10;
+    private static final int MAP_CONTROLS_WIDTH = 58;
+    private static final int MAP_CONTROLS_HEIGHT = 225;
+    private static final int ROUTE_PANEL_WIDTH = 340;
+    private static final int ROUTE_PANEL_TOP = 48;
+    private static final int ROUTE_PANEL_MARGIN = 12;
+    private Runnable onFloatingPanelClose;
+    private Runnable onRoutePanelClose;
+    private IntConsumer onRouteDirectionSelected;
 
     private final PropertyChangeListener mapListener = evt -> {
         String name = evt.getPropertyName();
@@ -125,8 +146,10 @@ public class MainView {
         frame.setSize(1100, 750);
         frame.setLocationRelativeTo(null);
         
+        // Set rounded corners
         frame.setShape(new RoundRectangle2D.Double(0, 0, 1100, 750, 20, 20));
         
+        // Update shape on resize
         frame.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
@@ -139,10 +162,12 @@ public class MainView {
             }
         });
         
+        // Set app icon
         try {
             ImageIcon icon = new ImageIcon(getClass().getResource("/sprites/icon.png"));
             if (icon.getImageLoadStatus() == MediaTracker.COMPLETE) {
                 List<Image> icons = new ArrayList<>();
+                // Create multiple scaled versions for taskbar (largest first for better quality)
                 Image scaled256 = icon.getImage().getScaledInstance(256, 256, Image.SCALE_SMOOTH);
                 Image scaled128 = icon.getImage().getScaledInstance(128, 128, Image.SCALE_SMOOTH);
                 Image scaled64 = icon.getImage().getScaledInstance(64, 64, Image.SCALE_SMOOTH);
@@ -159,6 +184,7 @@ public class MainView {
             System.out.println("Could not load app icon: " + e.getMessage());
         }
 
+        // Map takes the whole window
         mapViewer = MapFactory.createMapViewer();
 
         JLayeredPane layeredPane = new JLayeredPane();
@@ -171,43 +197,59 @@ public class MainView {
         overlayPanel.setOpaque(false);
         overlayPanel.setBounds(0, 0, 1100, 750);
         layeredPane.add(overlayPanel, JLayeredPane.PALETTE_LAYER);
+        
+        mapControlsPanel = createMapControlsPanel();
+        mapControlsPanel.setBounds(LEFT_STACK_X, LEFT_STACK_Y, MAP_CONTROLS_WIDTH, MAP_CONTROLS_HEIGHT);
+        overlayPanel.add(mapControlsPanel);
 
+        // Search button (top-left)
         ImageIcon lensIcon = new ImageIcon(getClass().getResource("/sprites/lente.png"));
         Image scaledLens = lensIcon.getImage().getScaledInstance(44, 44, Image.SCALE_SMOOTH);
         searchButton = new JButton(new ImageIcon(scaledLens));
         searchButton.setContentAreaFilled(false);
         searchButton.setBorderPainted(false);
-        searchButton.setBounds(15, 15, 48, 48);
+        searchButton.setFocusPainted(false);
+        searchButton.setBounds(5, 5, 48, 48);
         searchButton.setToolTipText("Cerca fermate e linee");
         searchButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        overlayPanel.add(searchButton);
+        mapControlsPanel.add(searchButton);
         
+        // Favorites button (below search button)
         ImageIcon starIcon = new ImageIcon(getClass().getResource("/sprites/star.png"));
         Image scaledStar = starIcon.getImage().getScaledInstance(40, 40, Image.SCALE_SMOOTH);
         favoritesButton = new JButton(new ImageIcon(scaledStar));
         favoritesButton.setContentAreaFilled(false);
         favoritesButton.setBorderPainted(false);
-        favoritesButton.setBounds(15, 70, 48, 48);
+        favoritesButton.setFocusPainted(false);
+        favoritesButton.setBounds(5, 60, 48, 48);
         favoritesButton.setToolTipText("Fermate preferite");
         favoritesButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        overlayPanel.add(favoritesButton);
+        mapControlsPanel.add(favoritesButton);
         
+        // Bus visibility toggle button (below favorites)
         ImageIcon busIcon = new ImageIcon(getClass().getResource("/sprites/bus1.png"));
         Image scaledBus = busIcon.getImage().getScaledInstance(40, 40, Image.SCALE_SMOOTH);
         busToggleButton = new JButton(new ImageIcon(scaledBus));
         busToggleButton.setContentAreaFilled(false);
         busToggleButton.setBorderPainted(false);
-        busToggleButton.setBounds(15, 125, 48, 48);
+        busToggleButton.setFocusPainted(false);
+        busToggleButton.setBounds(5, 115, 48, 48);
         busToggleButton.setToolTipText("Mostra/Nascondi autobus");
         busToggleButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        overlayPanel.add(busToggleButton);
+        mapControlsPanel.add(busToggleButton);
         
+        // Window control buttons (top-right corner) - add first so connection button is below
         createWindowControls();
         
+        // Connection button (in the same top-left controls panel)
         connectionButton = new ConnectionButton();
-        connectionButton.setBounds(1100 - 180, 48, 160, 48);
-        overlayPanel.add(connectionButton);
+        connectionButton.setBounds((MAP_CONTROLS_WIDTH - ConnectionButton.BUTTON_WIDTH) / 2,
+                170,
+                ConnectionButton.BUTTON_WIDTH,
+                ConnectionButton.BUTTON_HEIGHT);
+        mapControlsPanel.add(connectionButton);
         
+        // Service quality panel (top-left, next to connection card)
         serviceQualityPanel = new ServiceQualityPanel();
         serviceQualityPanel.setBounds(15, 750 - 65, 180, 50);
         overlayPanel.add(serviceQualityPanel);
@@ -222,28 +264,52 @@ public class MainView {
                 if (searchOverlay != null) {
                     searchOverlay.setBounds(0, 0, w, h);
                 }
+                // Update button positions
                 updateWindowControlPositions(w);
-                if (connectionButton != null) {
-                    connectionButton.setBounds(w - 180, 48, 160, 48);
-                }
                 if (serviceQualityPanel != null) {
                     serviceQualityPanel.setBounds(15, h - 65, 180, 50);
+                }
+                if (routeSidePanel != null) {
+                    routeSidePanel.setBounds(w - ROUTE_PANEL_WIDTH - ROUTE_PANEL_MARGIN, ROUTE_PANEL_TOP,
+                            ROUTE_PANEL_WIDTH, h - ROUTE_PANEL_TOP - ROUTE_PANEL_MARGIN);
                 }
                 updateFloatingPanelPosition();
             }
         });
         
+        // Enable window dragging from map
         enableWindowDrag();
 
         floatingPanel = new FloatingArrivalPanel();
         floatingPanel.setVisible(false);
-        floatingPanel.setOnClose(() -> floatingAnchorGeo = null);
+        floatingPanel.setOnClose(() -> {
+            floatingAnchorGeo = null;
+            if (onFloatingPanelClose != null) {
+                onFloatingPanelClose.run();
+            }
+        });
         overlayPanel.add(floatingPanel);
 
         searchOverlay = new SearchOverlay();
         searchOverlay.setVisible(false);
         searchOverlay.setBounds(0, 0, 1100, 750);
         layeredPane.add(searchOverlay, JLayeredPane.POPUP_LAYER);
+        
+        routeSidePanel = new RouteSidePanel();
+        routeSidePanel.setVisible(false);
+        routeSidePanel.setBounds(1100 - ROUTE_PANEL_WIDTH - ROUTE_PANEL_MARGIN, ROUTE_PANEL_TOP,
+                ROUTE_PANEL_WIDTH, 750 - ROUTE_PANEL_TOP - ROUTE_PANEL_MARGIN);
+        routeSidePanel.setOnClose(() -> {
+            if (onRoutePanelClose != null) {
+                onRoutePanelClose.run();
+            }
+        });
+        routeSidePanel.setOnDirectionSelected(directionId -> {
+            if (onRouteDirectionSelected != null) {
+                onRouteDirectionSelected.accept(directionId);
+            }
+        });
+        overlayPanel.add(routeSidePanel);
 
         mapViewer.addPropertyChangeListener(mapListener);
         setFloatingPanelMaxRows(10);
@@ -252,34 +318,68 @@ public class MainView {
     }
     
     private void createWindowControls() {
+        // Close button (top-right corner)
         closeButton = createOverlayButton("X", AppConstants.ERROR_COLOR);
         closeButton.setBounds(1100 - 40, 6, 34, 34);
         closeButton.addActionListener(e -> System.exit(0));
         overlayPanel.add(closeButton);
         
+        // Maximize button
         maxButton = createOverlayButton("O", new java.awt.Color(120, 120, 120));
         maxButton.setBounds(1100 - 76, 6, 34, 34);
         maxButton.addActionListener(e -> {
             if (frame.getExtendedState() == JFrame.MAXIMIZED_BOTH) {
+                // Restore to normal size
                 frame.setExtendedState(JFrame.NORMAL);
                 frame.setBounds(normalBounds);
             } else {
+                // Save current bounds before maximizing
                 normalBounds = frame.getBounds();
                 frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
             }
         });
         overlayPanel.add(maxButton);
         
+        // Minimize button
         minButton = createOverlayButton("-", new java.awt.Color(120, 120, 120));
         minButton.setBounds(1100 - 112, 6, 34, 34);
         minButton.addActionListener(e -> frame.setState(JFrame.ICONIFIED));
         overlayPanel.add(minButton);
     }
+
+    private JPanel createMapControlsPanel() {
+        JPanel panel = createOverlayCardPanel();
+        panel.setLayout(null);
+        return panel;
+    }
+
+    private JPanel createOverlayCardPanel() {
+        JPanel panel = new JPanel(null) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                int w = getWidth();
+                int h = getHeight();
+
+                g2.setColor(AppConstants.OVERLAY_CARD_BG);
+                g2.fillRoundRect(0, 0, w, h, AppConstants.OVERLAY_CARD_ARC, AppConstants.OVERLAY_CARD_ARC);
+
+                g2.setColor(AppConstants.OVERLAY_CARD_BORDER);
+                g2.drawRoundRect(0, 0, w - 1, h - 1, AppConstants.OVERLAY_CARD_ARC, AppConstants.OVERLAY_CARD_ARC);
+                g2.dispose();
+            }
+        };
+        panel.setOpaque(false);
+        return panel;
+    }
     
     private JButton createOverlayButton(String text, java.awt.Color hoverColor) {
         JButton btn = new JButton(text);
         btn.setFont(new Font("Segoe UI", Font.BOLD, 16));
-        btn.setForeground(new java.awt.Color(60, 60, 60)); // Nota in italiano
+        btn.setForeground(new java.awt.Color(60, 60, 60)); // Dark color
         btn.setContentAreaFilled(false);
         btn.setBorderPainted(false);
         btn.setFocusPainted(false);
@@ -305,9 +405,11 @@ public class MainView {
     }
     
     private void enableWindowDrag() {
+        // Allow dragging window from empty areas at the top
         mapViewer.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                // Only allow drag from top 50px area
                 if (e.getY() < 50 && e.getX() < mapViewer.getWidth() - 120) {
                     dragOffset = e.getPoint();
                     isDragging = true;
@@ -441,6 +543,18 @@ public class MainView {
     public void setOnViewAllTrips(Runnable callback) {
         floatingPanel.setOnViewAllTrips(callback);
     }
+
+    public void setOnFloatingPanelClose(Runnable callback) {
+        this.onFloatingPanelClose = callback;
+    }
+
+    public void setOnRoutePanelClose(Runnable callback) {
+        this.onRoutePanelClose = callback;
+    }
+
+    public void setOnRouteDirectionSelected(IntConsumer callback) {
+        this.onRouteDirectionSelected = callback;
+    }
     
     public void showAllTripsInPanel(List<String> allTrips) {
         floatingPanel.showAllTripsView(allTrips);
@@ -455,11 +569,35 @@ public class MainView {
         floatingAnchorGeo = null;
     }
 
+    public void showRouteSidePanel(String routeName, List<Stop> routeStops) {
+        if (routeSidePanel == null) return;
+        routeSidePanel.setRoute(routeName, routeStops);
+        routeSidePanel.setVisible(true);
+        routeSidePanel.repaint();
+    }
+
+    public void setRouteSidePanelDirections(Map<Integer, String> directions, int selectedDirection) {
+        if (routeSidePanel == null) return;
+        routeSidePanel.setDirectionOptions(directions, selectedDirection);
+    }
+
+    public void updateRouteSidePanelVehicles(List<RouteSidePanel.VehicleMarker> markers) {
+        if (routeSidePanel == null || !routeSidePanel.isVisible()) return;
+        routeSidePanel.setVehicleMarkers(markers);
+    }
+
+    public void hideRouteSidePanel() {
+        if (routeSidePanel == null) return;
+        routeSidePanel.setVisible(false);
+    }
+
     private void updateFloatingPanelPosition() {
         if (floatingAnchorGeo == null) return;
 
+        // STEP 1: PROJECT - Convert world coordinates to screen coordinates
         Point2D projectedPos = mapViewer.convertGeoPositionToPoint(floatingAnchorGeo);
         
+        // STEP 2: VALIDATE PROJECTION - If projection fails, stop is off-screen
         if (projectedPos == null) {
             if (floatingPanel.isVisible()) {
                 floatingPanel.setVisible(false);
@@ -472,6 +610,8 @@ public class MainView {
         double stopX = projectedPos.getX();
         double stopY = projectedPos.getY();
 
+        // STEP 3: DETECT OUT-OF-BOUNDS - Check if stop projection is beyond viewport
+        // If stop is beyond reasonable margin, hide panel (it's truly off-screen)
         int offScreenMargin = 200;
         if (stopX < -offScreenMargin || stopX > mapWidth + offScreenMargin ||
             stopY < -offScreenMargin || stopY > mapHeight + offScreenMargin) {
@@ -481,31 +621,43 @@ public class MainView {
             return;
         }
 
+        // STEP 4: CALCULATE TARGET POSITION - Where panel should go based on stop projection
         Dimension pref = floatingPanel.getPreferredPanelSize();
         int panelWidth = pref.width;
         int panelHeight = pref.height;
         
+        // Calculate ideal panel position (centered above stop, no clamping)
         int targetX = (int) stopX - panelWidth / 2;
         int targetY = (int) stopY - panelHeight - 8;
 
+        // STEP 5: DETACHMENT VALIDATION - Check if panel can be placed without clamping
+        // If the panel needs to be clamped to screen bounds, it means the stop is at the edge
+        // and the panel position would diverge from the stop's true projection.
+        // This is detachment - the panel would "stick" to screen edge while stop goes off-screen.
         
         int minValidX = 5;
         int maxValidX = mapWidth - panelWidth - 5;
         int minValidY = 5;
         int maxValidY = mapHeight - panelHeight - 5;
         
+        // Panel cannot be placed at its true position without clamping
         if (targetX < minValidX || targetX > maxValidX ||
             targetY < minValidY || targetY > maxValidY) {
+            // Stop is too close to edge - panel would need clamping
+            // This breaks the spatial binding, so hide the panel
             if (floatingPanel.isVisible()) {
                 floatingPanel.setVisible(false);
             }
             return;
         }
 
+        // STEP 6: SHOW AND POSITION - Panel can stay bound to stop projection
+        // Stop is visible and panel can be placed at its true screen position
         if (!floatingPanel.isVisible()) {
             floatingPanel.setVisible(true);
         }
 
+        // Place panel at exact projected position (no clamping or correction)
         floatingPanel.setBounds(targetX, targetY, panelWidth, panelHeight);
         floatingPanel.revalidate();
         floatingPanel.repaint();
