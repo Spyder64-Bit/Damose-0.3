@@ -24,6 +24,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextPane;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.HyperlinkEvent;
 
@@ -35,6 +36,9 @@ import damose.config.AppConstants;
 public class InfoOverlay extends JPanel {
 
     private final JPanel contentPanel;
+    private JTextPane aboutPane;
+    private Timer aboutGlitchTimer;
+    private boolean aboutGlitchPhase;
     private static final String GITHUB_URL = "https://github.com/Spyder64-Bit";
 
     public InfoOverlay() {
@@ -107,30 +111,25 @@ public class InfoOverlay extends JPanel {
         body.add(createSectionTitle("About Me"));
         body.add(createAboutHeader());
         body.add(Box.createVerticalStrut(8));
-        JTextPane about = new JTextPane();
-        about.setContentType("text/html");
-        about.setEditable(false);
-        about.setFocusable(false);
-        about.setBackground(AppConstants.BG_LIGHT);
-        about.setForeground(AppConstants.TEXT_PRIMARY);
-        about.setFont(AppConstants.FONT_BODY);
-        about.setBorder(new EmptyBorder(12, 12, 12, 12));
-        about.setAlignmentX(Component.LEFT_ALIGNMENT);
-        about.setMaximumSize(new Dimension(Integer.MAX_VALUE, 130));
-        about.setText("""
-                <html><body style='font-family:Segoe UI; font-size:12px; color:#E5E5EA; margin:0;'>
-                Ciao! Sono Spyder.<br/>
-                Damose &egrave; nato a Roma, tra tazze di caff&egrave; e Nirvana in sottofondo.<br/>
-                &Egrave; il mio primo progetto serio e spero che sia una porta su tante altre cose.<br/>
-                Controlla il mio Github -&gt; <a href='https://github.com/Spyder64-Bit'>https://github.com/Spyder64-Bit</a>
-                </body></html>
-                """);
-        about.addHyperlinkListener(e -> {
+        aboutPane = new JTextPane();
+        aboutPane.setContentType("text/html");
+        aboutPane.setEditable(false);
+        aboutPane.setFocusable(false);
+        aboutPane.setBackground(AppConstants.BG_LIGHT);
+        aboutPane.setForeground(AppConstants.TEXT_PRIMARY);
+        aboutPane.setFont(AppConstants.FONT_BODY);
+        aboutPane.setBorder(new EmptyBorder(12, 12, 12, 12));
+        aboutPane.setAlignmentX(Component.LEFT_ALIGNMENT);
+        aboutPane.setPreferredSize(new Dimension(560, 130));
+        aboutPane.setMinimumSize(new Dimension(560, 130));
+        aboutPane.setMaximumSize(new Dimension(560, 130));
+        aboutPane.setText(buildAboutHtml(false));
+        aboutPane.addHyperlinkListener(e -> {
             if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED && e.getURL() != null) {
                 openExternalLink(e.getURL().toString());
             }
         });
-        body.add(about);
+        body.add(aboutPane);
 
         JScrollPane scrollPane = new JScrollPane(body);
         scrollPane.setBorder(null);
@@ -165,10 +164,12 @@ public class InfoOverlay extends JPanel {
     public void showInfo() {
         setVisible(true);
         layoutPanel();
+        startAboutGlitchEffect();
         SwingUtilities.invokeLater(this::requestFocusInWindow);
     }
 
     private void closeOverlay() {
+        stopAboutGlitchEffect();
         setVisible(false);
     }
 
@@ -315,6 +316,45 @@ public class InfoOverlay extends JPanel {
             return new ImageIcon(scaled);
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    private String buildAboutHtml(boolean glitch) {
+        String font = "Segoe UI";
+        String textColor = glitch ? "#DCEEFF" : "#E5E7ED";
+        String opening = "<html><body style='font-family:" + font
+                + "; font-size:12px; color:" + textColor
+                + "; margin:0; width:520px; word-wrap:break-word; overflow-wrap:anywhere;'>";
+        return opening
+                + "ciao! sono spyder.<br/>"
+                + "damose &egrave; nato a roma, tra tazze di caff&egrave; e nirvana in sottofondo.<br/>"
+                + "&egrave; il mio primo progetto serio e spero che sia una porta su tante altre cose.<br/>"
+                + "controlla il mio github -&gt; <a href='https://github.com/Spyder64-Bit'>spyder64-bit</a>"
+                + "</body></html>";
+    }
+
+    private void startAboutGlitchEffect() {
+        if (aboutPane == null) {
+            return;
+        }
+        if (aboutGlitchTimer == null) {
+            aboutGlitchTimer = new Timer(700, e -> {
+                aboutGlitchPhase = !aboutGlitchPhase;
+                aboutPane.setText(buildAboutHtml(aboutGlitchPhase));
+            });
+        }
+        if (!aboutGlitchTimer.isRunning()) {
+            aboutGlitchTimer.start();
+        }
+    }
+
+    private void stopAboutGlitchEffect() {
+        if (aboutGlitchTimer != null) {
+            aboutGlitchTimer.stop();
+        }
+        aboutGlitchPhase = false;
+        if (aboutPane != null) {
+            aboutPane.setText(buildAboutHtml(false));
         }
     }
 }

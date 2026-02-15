@@ -43,6 +43,7 @@ public class MapOverlayManager {
     private static String busRouteFilter = null;
     private static Integer busDirectionFilter = null;
     private static String selectedVehicleMarkerId = null;
+    private static String selectedStopId = null;
 
     private static boolean busesVisible = true;
 
@@ -83,7 +84,7 @@ public class MapOverlayManager {
     }
 
     private static void drawStops(Graphics2D g, JXMapViewer map) {
-        stopOverlayRenderer.drawStops(g, map, visibleStops, routeStops);
+        stopOverlayRenderer.drawStops(g, map, visibleStops, routeStops, selectedStopId);
     }
 
     private static void drawBuses(Graphics2D g, JXMapViewer map) {
@@ -189,6 +190,25 @@ public class MapOverlayManager {
         setSelectedVehicleMarkerId(null);
     }
 
+    /**
+     * Updates selected stop marker id for map highlight.
+     */
+    public static void setSelectedStopId(String stopId) {
+        synchronized (lock) {
+            selectedStopId = trimToNull(stopId);
+        }
+        if (currentMap != null) {
+            currentMap.repaint();
+        }
+    }
+
+    /**
+     * Clears selected stop marker highlight on map.
+     */
+    public static void clearSelectedStopId() {
+        setSelectedStopId(null);
+    }
+
     public static void updateMap(JXMapViewer mapViewer,
                                  List<Stop> allStops,
                                  List<VehiclePosition> busPositions,
@@ -283,6 +303,7 @@ public class MapOverlayManager {
         synchronized (lock) {
             visibleStops.clear();
             currentStopIds.clear();
+            selectedStopId = null;
         }
     }
 

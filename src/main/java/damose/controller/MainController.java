@@ -319,6 +319,7 @@ public class MainController {
 
     private void handleStopSelection(Stop stop, boolean fromSearch) {
         if (stop.isFakeLine()) {
+            MapOverlayManager.clearSelectedStopId();
             handleLineSelection(stop);
         } else {
             clearFollowedVehicle(true);
@@ -326,6 +327,11 @@ public class MainController {
                 routePanelFlow.closeRoutePanelOverlay(false);
             }
             MapOverlayManager.setVisibleStops(Collections.singletonList(stop));
+            if (fromSearch) {
+                MapOverlayManager.setSelectedStopId(stop.getStopId());
+            } else {
+                MapOverlayManager.clearSelectedStopId();
+            }
             if (fromSearch) {
                 routeViewport.centerOnStopWithBottomAnchor(view.getMapViewer(), stop);
             } else {
@@ -431,6 +437,7 @@ public class MainController {
 
         clearFollowedVehicle(true);
         MapOverlayManager.setVisibleStops(Collections.singletonList(stop));
+        MapOverlayManager.clearSelectedStopId();
         routeViewport.centerOnStop(view.getMapViewer(), stop);
         if (stopPanelFlow != null) {
             stopPanelFlow.showFloatingArrivals(stop, mode, currentFeedTs);

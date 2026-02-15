@@ -18,11 +18,19 @@ jpackage --type exe --name Damose --input target --main-jar damose-bus-tracker-1
 `target/installer/Damose-1.0.exe`
 
 ### Opzione 2: JAR (cross-platform)
-1. Genera il jar eseguibile:
+1. Download diretto del jar:
+[damose-bus-tracker-1.0.0.jar](docs/damose-bus-tracker-1.0.0.jar)
+
+2. Avvia:
+```bash
+java -jar damose-bus-tracker-1.0.0.jar
+```
+
+3. In alternativa, genera il jar eseguibile localmente:
 ```bash
 mvn clean package
 ```
-2. Avvia:
+4. Avvia:
 ```bash
 java -jar target/damose-bus-tracker-1.0.0.jar
 ```

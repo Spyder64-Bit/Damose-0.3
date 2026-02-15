@@ -33,7 +33,7 @@ final class StopOverlayRenderer {
         }
     }
 
-    void drawStops(Graphics2D g, JXMapViewer map, List<Stop> visibleStops, List<Stop> routeStops) {
+    void drawStops(Graphics2D g, JXMapViewer map, List<Stop> visibleStops, List<Stop> routeStops, String selectedStopId) {
         if ((visibleStops == null || visibleStops.isEmpty()) && (routeStops == null || routeStops.isEmpty())) {
             return;
         }
@@ -63,7 +63,9 @@ final class StopOverlayRenderer {
                     continue;
                 }
 
-                drawStop(g, screenX, screenY, size, icon);
+                boolean isSelected = selectedStopId != null && selectedStopId.equals(stop.getStopId());
+                int drawSize = isSelected ? Math.min(48, size + 14) : size;
+                drawStop(g, screenX, screenY, drawSize, icon);
             }
         }
 

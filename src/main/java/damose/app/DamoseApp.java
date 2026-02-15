@@ -107,6 +107,7 @@ public class DamoseApp {
     private static void startRealtimeWarmup() {
         RealtimeService.setOnDataReceived(() -> markRtReady(true));
         RealtimeService.setMode(ConnectionMode.ONLINE);
+        RealtimeService.startPolling();
 
         Timer timeoutCheck = new Timer(AppConstants.RT_TIMEOUT_SECONDS * 1000 + 500, e -> {
             ((Timer) e.getSource()).stop();
