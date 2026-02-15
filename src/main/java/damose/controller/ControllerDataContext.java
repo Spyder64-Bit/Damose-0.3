@@ -10,6 +10,9 @@ import damose.model.Trip;
 import damose.service.ArrivalService;
 import damose.service.RouteService;
 
+/**
+ * Coordinates application flow for controller data context.
+ */
 public final class ControllerDataContext {
 
     private final List<Stop> stops;
@@ -36,30 +39,51 @@ public final class ControllerDataContext {
         this.arrivalService = arrivalService;
     }
 
+    /**
+     * Returns the stops.
+     */
     public List<Stop> getStops() {
         return stops;
     }
 
+    /**
+     * Returns the trips.
+     */
     public List<Trip> getTrips() {
         return trips;
     }
 
+    /**
+     * Returns the stop times.
+     */
     public List<StopTime> getStopTimes() {
         return stopTimes;
     }
 
+    /**
+     * Returns the trip matcher.
+     */
     public TripMatcher getTripMatcher() {
         return tripMatcher;
     }
 
+    /**
+     * Returns the stop trip mapper.
+     */
     public StopTripMapper getStopTripMapper() {
         return stopTripMapper;
     }
 
+    /**
+     * Returns the route service.
+     */
     public RouteService getRouteService() {
         return routeService;
     }
 
+    /**
+     * Returns the arrival service.
+     */
     public ArrivalService getArrivalService() {
         return arrivalService;
     }

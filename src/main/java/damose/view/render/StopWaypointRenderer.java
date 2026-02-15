@@ -16,6 +16,9 @@ import org.jxmapviewer.viewer.WaypointRenderer;
 
 import damose.model.StopWaypoint;
 
+/**
+ * Rendering logic for stop waypoint renderer.
+ */
 public class StopWaypointRenderer implements WaypointRenderer<StopWaypoint> {
 
     private final Image originalImage;
@@ -28,7 +31,7 @@ public class StopWaypointRenderer implements WaypointRenderer<StopWaypoint> {
             ImageIcon icon = new ImageIcon(imageUrl);
             originalImage = icon.getImage();
             imageLoaded = (originalImage != null);
-            
+
             if (imageLoaded) {
                 for (int s = 16; s <= 48; s += 4) {
                     sizeCache.put(s, originalImage.getScaledInstance(s, s, Image.SCALE_FAST));
@@ -43,25 +46,28 @@ public class StopWaypointRenderer implements WaypointRenderer<StopWaypoint> {
 
     private Image getScaled(int size) {
         if (!imageLoaded) return null;
-        
+
         int cachedSize = ((size + 2) / 4) * 4;
         cachedSize = Math.max(16, Math.min(cachedSize, 48));
-        
+
         return sizeCache.computeIfAbsent(cachedSize,
             s -> originalImage.getScaledInstance(s, s, Image.SCALE_FAST)
         );
     }
 
     @Override
+    /**
+     * Handles paintWaypoint.
+     */
     public void paintWaypoint(Graphics2D g, JXMapViewer map, StopWaypoint wp) {
         if (wp == null || wp.getPosition() == null) return;
-        
+
         Point2D worldPt = map.getTileFactory().geoToPixel(wp.getPosition(), map.getZoom());
-        
+
         Rectangle2D viewport = map.getViewportBounds();
         int screenX = (int) (worldPt.getX() - viewport.getX());
         int screenY = (int) (worldPt.getY() - viewport.getY());
-        
+
         if (screenX < -50 || screenX > map.getWidth() + 50 ||
             screenY < -50 || screenY > map.getHeight() + 50) {
             return;

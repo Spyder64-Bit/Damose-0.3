@@ -13,15 +13,21 @@ import org.jxmapviewer.viewer.TileFactoryInfo;
 
 import damose.config.AppConstants;
 
+/**
+ * Map utility for map factory.
+ */
 public final class MapFactory {
 
     private MapFactory() {
     }
 
+    /**
+     * Returns the result of createMapViewer.
+     */
     public static JXMapViewer createMapViewer() {
         TileFactoryInfo info = new OSMTileFactoryInfo("OpenStreetMap", "https://tile.openstreetmap.org");
         DefaultTileFactory tileFactory = new DefaultTileFactory(info);
-        
+
         tileFactory.setThreadPoolSize(4);
 
         File cacheDir = new File(System.getProperty("user.home"), ".jxmapviewer2");
@@ -31,7 +37,7 @@ public final class MapFactory {
         map.setTileFactory(tileFactory);
         map.setAddressLocation(new GeoPosition(AppConstants.ROME_LAT, AppConstants.ROME_LON));
         map.setZoom(AppConstants.DEFAULT_ZOOM);
-        
+
         map.setDoubleBuffered(true);
 
         PanMouseInputListener pan = new PanMouseInputListener(map);

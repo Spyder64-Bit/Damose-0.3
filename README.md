@@ -70,6 +70,8 @@ classDiagram
       -ControllerDataLoader dataLoader
       -ControllerDataContext dataContext
       -RealtimeUpdateScheduler realtimeScheduler
+      -RouteViewportNavigator routeViewport
+      -RouteVehicleMarkerBuilder routeVehicleMarkerBuilder
       -MainView view
       -ConnectionMode mode
       +start()
@@ -93,20 +95,36 @@ classDiagram
       +refreshMapOverlay(...)
     }
 
+    class RouteViewportNavigator {
+      +centerOnStop(...)
+      +centerOnStopWithBottomAnchor(...)
+      +fitMapToRoute(...)
+    }
+
+    class RouteVehicleMarkerBuilder {
+      +buildForRoute(...)
+    }
+
     class MainView
     class ArrivalService
     class RouteService
     class RealtimeService
     class GtfsParser
     class MapOverlayManager
+    class MapAnimator
     class StopTripMapper
+    class TripMatcher
 
     DamoseApp --> MainController
     MainController --> ControllerDataLoader
     MainController --> ControllerDataContext
     MainController --> RealtimeUpdateScheduler
+    MainController --> RouteViewportNavigator
+    MainController --> RouteVehicleMarkerBuilder
     MainController --> MainView
     MainController --> RealtimeService
+    RouteViewportNavigator --> MapAnimator
+    RouteVehicleMarkerBuilder --> TripMatcher
     RealtimeUpdateScheduler --> RealtimeService
     RealtimeUpdateScheduler --> GtfsParser
     RealtimeUpdateScheduler --> ArrivalService

@@ -8,27 +8,40 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.jxmapviewer.viewer.GeoPosition;
+
 import damose.model.Stop;
 import damose.model.StopTime;
 import damose.model.Trip;
 
+/**
+ * Provides service logic for route service.
+ */
 public class RouteService {
 
     private final List<Trip> trips;
     private final List<StopTime> stopTimes;
     private final Map<String, Stop> stopsById;
+    private final Map<String, List<GeoPosition>> shapesById;
     private final Map<String, List<Trip>> tripsByRouteId;
     private final Map<String, Integer> stopCountByTripId;
 
-    public RouteService(List<Trip> trips, List<StopTime> stopTimes, List<Stop> stops) {
+    public RouteService(List<Trip> trips,
+                        List<StopTime> stopTimes,
+                        List<Stop> stops,
+                        Map<String, List<GeoPosition>> shapesById) {
         this.trips = trips;
         this.stopTimes = stopTimes;
         this.stopsById = stops.stream()
                 .collect(Collectors.toMap(Stop::getStopId, s -> s, (a, b) -> a));
+        this.shapesById = shapesById != null ? shapesById : Collections.emptyMap();
         this.tripsByRouteId = buildTripsByRouteId(trips);
         this.stopCountByTripId = buildStopCountByTripId(stopTimes);
     }
 
+    /**
+     * Returns the result of findRepresentativeTrip.
+     */
     public Trip findRepresentativeTrip(String routeId, String headsign) {
         return findTripsByRouteId(routeId).stream()
                 .filter(t -> headsign == null || t.getTripHeadsign().equalsIgnoreCase(headsign))
@@ -36,6 +49,9 @@ public class RouteService {
                 .orElse(null);
     }
 
+    /**
+     * Returns the result of findTripsByRouteId.
+     */
     public List<Trip> findTripsByRouteId(String routeId) {
         if (routeId == null) return Collections.emptyList();
 
@@ -56,6 +72,9 @@ public class RouteService {
         return Collections.emptyList();
     }
 
+    /**
+     * Returns the stops for trip.
+     */
     public List<Stop> getStopsForTrip(String tripId) {
         if (tripId == null) return Collections.emptyList();
 
@@ -75,6 +94,9 @@ public class RouteService {
         return orderedStops;
     }
 
+    /**
+     * Returns the stops for route.
+     */
     public List<Stop> getStopsForRoute(String routeId) {
         if (routeId == null) return Collections.emptyList();
 
@@ -86,6 +108,9 @@ public class RouteService {
         return getStopsForTrip(bestTrip.getTripId());
     }
 
+    /**
+     * Returns the stops for route and direction.
+     */
     public List<Stop> getStopsForRouteAndDirection(String routeId, int directionId) {
         if (routeId == null) return Collections.emptyList();
 
@@ -100,12 +125,57 @@ public class RouteService {
         return getStopsForTrip(bestTrip.getTripId());
     }
 
+    /**
+     * Returns the shape for route.
+     */
+    public List<GeoPosition> getShapeForRoute(String routeId) {
+        if (routeId == null) return Collections.emptyList();
+
+        List<Trip> routeTrips = findTripsByRouteId(routeId);
+        if (routeTrips.isEmpty()) return Collections.emptyList();
+
+        Trip bestShapeTrip = chooseBestTripForShape(routeTrips);
+        if (bestShapeTrip != null) {
+            return getShapeForTrip(bestShapeTrip);
+        }
+
+        Trip bestTrip = chooseBestTrip(routeTrips);
+        return bestTrip == null ? Collections.emptyList() : getShapeForTrip(bestTrip);
+    }
+
+    /**
+     * Returns the shape for route and direction.
+     */
+    public List<GeoPosition> getShapeForRouteAndDirection(String routeId, int directionId) {
+        if (routeId == null) return Collections.emptyList();
+
+        List<Trip> routeTrips = findTripsByRouteId(routeId).stream()
+                .filter(t -> t.getDirectionId() == directionId)
+                .collect(Collectors.toList());
+
+        if (routeTrips.isEmpty()) return Collections.emptyList();
+
+        Trip bestShapeTrip = chooseBestTripForShape(routeTrips);
+        if (bestShapeTrip != null) {
+            return getShapeForTrip(bestShapeTrip);
+        }
+
+        Trip bestTrip = chooseBestTrip(routeTrips);
+        return bestTrip == null ? Collections.emptyList() : getShapeForTrip(bestTrip);
+    }
+
+    /**
+     * Returns the stops for route and headsign.
+     */
     public List<Stop> getStopsForRouteAndHeadsign(String routeId, String headsign) {
         Trip trip = findRepresentativeTrip(routeId, headsign);
         if (trip == null) return Collections.emptyList();
         return getStopsForTrip(trip.getTripId());
     }
 
+    /**
+     * Returns the headsigns for route.
+     */
     public List<String> getHeadsignsForRoute(String routeId) {
         return findTripsByRouteId(routeId).stream()
                 .map(Trip::getTripHeadsign)
@@ -113,6 +183,9 @@ public class RouteService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Returns the directions for route.
+     */
     public List<Integer> getDirectionsForRoute(String routeId) {
         return findTripsByRouteId(routeId).stream()
                 .map(Trip::getDirectionId)
@@ -121,6 +194,9 @@ public class RouteService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Returns the representative headsign for route and direction.
+     */
     public String getRepresentativeHeadsignForRouteAndDirection(String routeId, int directionId) {
         return findTripsByRouteId(routeId).stream()
                 .filter(t -> t.getDirectionId() == directionId)
@@ -163,6 +239,48 @@ public class RouteService {
             }
         }
         return bestTrip;
+    }
+
+    private Trip chooseBestTripForShape(List<Trip> candidates) {
+        if (candidates == null || candidates.isEmpty()) return null;
+
+        Trip bestTrip = null;
+        int bestShapePoints = -1;
+        int bestStops = -1;
+
+        for (Trip trip : candidates) {
+            int shapePoints = getShapePointCount(trip);
+            if (shapePoints < 2) continue;
+
+            int stopCount = stopCountByTripId.getOrDefault(trip.getTripId(), 0);
+            if (shapePoints > bestShapePoints
+                    || (shapePoints == bestShapePoints && stopCount > bestStops)) {
+                bestShapePoints = shapePoints;
+                bestStops = stopCount;
+                bestTrip = trip;
+            }
+        }
+        return bestTrip;
+    }
+
+    private List<GeoPosition> getShapeForTrip(Trip trip) {
+        if (trip == null) return Collections.emptyList();
+        String shapeId = trip.getShapeId();
+        if (shapeId == null || shapeId.isBlank()) return Collections.emptyList();
+
+        List<GeoPosition> shape = shapesById.get(shapeId.trim());
+        if (shape == null || shape.size() < 2) {
+            return Collections.emptyList();
+        }
+        return new ArrayList<>(shape);
+    }
+
+    private int getShapePointCount(Trip trip) {
+        if (trip == null || trip.getShapeId() == null || trip.getShapeId().isBlank()) {
+            return 0;
+        }
+        List<GeoPosition> shape = shapesById.get(trip.getShapeId().trim());
+        return shape == null ? 0 : shape.size();
     }
 
 }

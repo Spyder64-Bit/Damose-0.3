@@ -29,6 +29,9 @@ import javax.swing.event.HyperlinkEvent;
 
 import damose.config.AppConstants;
 
+/**
+ * UI component for info overlay.
+ */
 public class InfoOverlay extends JPanel {
 
     private final JPanel contentPanel;
@@ -65,11 +68,17 @@ public class InfoOverlay extends JPanel {
             }
 
             @Override
+            /**
+             * Handles mouseEntered.
+             */
             public void mouseEntered(MouseEvent e) {
                 close.setForeground(AppConstants.ERROR_COLOR);
             }
 
             @Override
+            /**
+             * Handles mouseExited.
+             */
             public void mouseExited(MouseEvent e) {
                 close.setForeground(AppConstants.TEXT_SECONDARY);
             }
@@ -86,8 +95,8 @@ public class InfoOverlay extends JPanel {
         body.add(createLegendRow("/sprites/lente.png", 26, "Pulsante cerca fermate/linee", Image.SCALE_SMOOTH));
         body.add(createLegendRow("/sprites/star.png", 24, "Pulsante preferiti", Image.SCALE_SMOOTH));
         body.add(createLegendRow("/sprites/bus1.png", 24, "Mostra/Nascondi autobus", Image.SCALE_SMOOTH));
-        body.add(createLegendRow("/sprites/wifi.png", 24, "Stato online", Image.SCALE_SMOOTH));
-        body.add(createLegendRow("/sprites/nowifi.png", 24, "Stato offline", Image.SCALE_SMOOTH));
+        body.add(createLegendRow("/sprites/wifi.png", 24, "Stato online - Clicca per andare Offline", Image.SCALE_SMOOTH));
+        body.add(createLegendRow("/sprites/nowifi.png", 24, "Stato offline - Clicca per andare Online", Image.SCALE_SMOOTH));
         body.add(createLegendRow("/sprites/connecting.gif", 24, "Connessione in corso", Image.SCALE_DEFAULT));
         body.add(createLegendRow("/sprites/info.png", 24, "Apre questo pannello info", Image.SCALE_SMOOTH));
         body.add(createLegendRow("/sprites/bus.png", 22, "Marker autobus", Image.SCALE_SMOOTH));
@@ -150,6 +159,9 @@ public class InfoOverlay extends JPanel {
         });
     }
 
+    /**
+     * Handles showInfo.
+     */
     public void showInfo() {
         setVisible(true);
         layoutPanel();
@@ -169,6 +181,9 @@ public class InfoOverlay extends JPanel {
     }
 
     @Override
+    /**
+     * Updates the bounds value.
+     */
     public void setBounds(int x, int y, int width, int height) {
         super.setBounds(x, y, width, height);
         if (contentPanel != null && isVisible()) {
@@ -185,6 +200,9 @@ public class InfoOverlay extends JPanel {
     }
 
     @Override
+    /**
+     * Returns whether opaque.
+     */
     public boolean isOpaque() {
         return false;
     }
@@ -300,3 +318,4 @@ public class InfoOverlay extends JPanel {
         }
     }
 }
+

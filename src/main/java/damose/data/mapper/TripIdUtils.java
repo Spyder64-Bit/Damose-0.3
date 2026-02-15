@@ -4,11 +4,17 @@ import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
+/**
+ * Data mapping logic for trip id utils.
+ */
 public final class TripIdUtils {
 
     private TripIdUtils() {
     }
 
+    /**
+     * Returns the result of normalizeSimple.
+     */
     public static String normalizeSimple(String raw) {
         if (raw == null) return null;
         String s = raw.trim();
@@ -45,6 +51,9 @@ public final class TripIdUtils {
         return s.isEmpty() ? null : s;
     }
 
+    /**
+     * Returns the result of generateVariants.
+     */
     public static Set<String> generateVariants(String rawTripId) {
         Set<String> out = new HashSet<>();
         if (rawTripId == null) return out;
@@ -84,8 +93,12 @@ public final class TripIdUtils {
         return out;
     }
 
+    /**
+     * Returns the result of normalizeOrEmpty.
+     */
     public static String normalizeOrEmpty(String raw) {
         String n = normalizeSimple(raw);
         return n == null ? "" : n;
     }
 }
+

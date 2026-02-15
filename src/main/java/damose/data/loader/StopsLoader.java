@@ -9,15 +9,24 @@ import java.util.List;
 import damose.config.AppConstants;
 import damose.model.Stop;
 
+/**
+ * Static data loader for stops loader.
+ */
 public final class StopsLoader {
 
     private StopsLoader() {
     }
 
+    /**
+     * Returns the result of load.
+     */
     public static List<Stop> load() {
         return load(AppConstants.GTFS_STOPS_PATH);
     }
 
+    /**
+     * Returns the result of load.
+     */
     public static List<Stop> load(String resourcePath) {
         List<Stop> stops = new ArrayList<>();
 

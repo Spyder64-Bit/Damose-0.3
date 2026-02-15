@@ -19,10 +19,13 @@ import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JButton;
 import javax.swing.DefaultListModel;
+import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
@@ -33,10 +36,14 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 import damose.config.AppConstants;
+import damose.database.SessionManager;
 import damose.model.Stop;
 import damose.model.VehicleType;
 import damose.service.FavoritesService;
 
+/**
+ * Search overlay component for stops, lines, and favorites.
+ */
 public class SearchOverlay extends JPanel {
 
     private final JTextField searchField;
@@ -46,6 +53,7 @@ public class SearchOverlay extends JPanel {
     private final JLabel stopsModeBtn;
     private final JLabel linesModeBtn;
     private final JLabel favoritesModeBtn;
+    private final JButton closeOverlayButton;
 
     private enum SearchMode { STOPS, LINES, FAVORITES }
     private SearchMode currentMode = SearchMode.STOPS;
@@ -53,6 +61,7 @@ public class SearchOverlay extends JPanel {
     private List<Stop> allLines = new ArrayList<>();
     private List<Stop> favoriteStops = new ArrayList<>();
     private Consumer<Stop> onSelect;
+    private Runnable onFavoritesLoginRequired;
 
     public SearchOverlay() {
         setLayout(null);
@@ -107,6 +116,31 @@ public class SearchOverlay extends JPanel {
         modePanel.add(Box.createHorizontalStrut(6));
         modePanel.add(favoritesModeBtn);
 
+        closeOverlayButton = new JButton();
+        closeOverlayButton.setIcon(new CloseIcon(12, Color.WHITE));
+        closeOverlayButton.setFocusPainted(false);
+        closeOverlayButton.setContentAreaFilled(false);
+        closeOverlayButton.setOpaque(false);
+        closeOverlayButton.setBorderPainted(false);
+        closeOverlayButton.setBorder(BorderFactory.createEmptyBorder());
+        closeOverlayButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        closeOverlayButton.setPreferredSize(new Dimension(30, 30));
+        closeOverlayButton.setMinimumSize(new Dimension(30, 30));
+        closeOverlayButton.setMaximumSize(new Dimension(30, 30));
+        closeOverlayButton.setToolTipText("Chiudi ricerca");
+        closeOverlayButton.addActionListener(e -> closeOverlay());
+        closeOverlayButton.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                closeOverlayButton.setIcon(new CloseIcon(12, AppConstants.ACCENT_HOVER));
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                closeOverlayButton.setIcon(new CloseIcon(12, Color.WHITE));
+            }
+        });
+
         searchField = new JTextField();
         searchField.setBackground(AppConstants.BG_FIELD);
         searchField.setForeground(AppConstants.TEXT_PRIMARY);
@@ -156,7 +190,13 @@ public class SearchOverlay extends JPanel {
 
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setOpaque(false);
-        topPanel.add(modePanel, BorderLayout.NORTH);
+
+        JPanel modeHeader = new JPanel(new BorderLayout());
+        modeHeader.setOpaque(false);
+        modeHeader.add(modePanel, BorderLayout.CENTER);
+        modeHeader.add(closeOverlayButton, BorderLayout.EAST);
+
+        topPanel.add(modeHeader, BorderLayout.NORTH);
         topPanel.add(searchField, BorderLayout.CENTER);
         contentPanel.add(topPanel, BorderLayout.NORTH);
 
@@ -167,7 +207,7 @@ public class SearchOverlay extends JPanel {
         resultList.setSelectionBackground(AppConstants.ACCENT);
         resultList.setSelectionForeground(Color.WHITE);
         resultList.setFont(AppConstants.FONT_BODY);
-        resultList.setFixedCellHeight(58); // Nota in italiano
+        resultList.setFixedCellHeight(58);
         resultList.setCellRenderer(new StopCellRenderer());
 
         resultList.addKeyListener(new KeyAdapter() {
@@ -181,7 +221,7 @@ public class SearchOverlay extends JPanel {
                     toggleSelectedFavorite();
                 } else if (e.getKeyCode() == KeyEvent.VK_DELETE
                         || e.getKeyCode() == KeyEvent.VK_BACK_SPACE) {
-                    // Prevent default list beep on unsupported delete actions.
+
                     e.consume();
                 }
             }
@@ -247,7 +287,7 @@ public class SearchOverlay extends JPanel {
         linesModeBtn.setForeground(AppConstants.TEXT_SECONDARY);
         favoritesModeBtn.setBackground(AppConstants.BG_FIELD);
         favoritesModeBtn.setForeground(AppConstants.TEXT_SECONDARY);
-        
+
         JLabel selected = switch (currentMode) {
             case STOPS -> stopsModeBtn;
             case LINES -> linesModeBtn;
@@ -266,7 +306,7 @@ public class SearchOverlay extends JPanel {
             case LINES -> allLines;
             case FAVORITES -> favoriteStops;
         };
-        
+
         int limit = (currentMode == SearchMode.FAVORITES) ? 100 : 50;
         List<Stop> matches = new ArrayList<>();
         for (Stop s : source) {
@@ -346,8 +386,12 @@ public class SearchOverlay extends JPanel {
             }
         }
     }
-    
+
     private void toggleSelectedFavorite() {
+        if (!isLoggedIn()) {
+            showFavoritesLoginRequiredPopup();
+            return;
+        }
         Stop selected = resultList.getSelectedValue();
         if (selected != null) {
             if (selected.isFakeLine()) {
@@ -356,12 +400,30 @@ public class SearchOverlay extends JPanel {
                 FavoritesService.toggleFavorite(selected.getStopId());
             }
             resultList.repaint();
-            
+
             if (currentMode == SearchMode.FAVORITES) {
                 favoriteStops = FavoritesService.getAllFavorites();
                 filterResults();
             }
         }
+    }
+
+    private boolean isLoggedIn() {
+        return SessionManager.isLoggedIn() && SessionManager.getCurrentUser() != null;
+    }
+
+    private void showFavoritesLoginRequiredPopup() {
+        if (onFavoritesLoginRequired != null) {
+            onFavoritesLoginRequired.run();
+            return;
+        }
+        JOptionPane.showMessageDialog(
+                this,
+                "Per salvare i preferiti devi creare un account.\n"
+                        + "Chiudi l'applicazione, riaprila e crea un account se vuoi usare i preferiti.",
+                "Account richiesto",
+                JOptionPane.INFORMATION_MESSAGE
+        );
     }
 
     private void closeOverlay() {
@@ -387,15 +449,28 @@ public class SearchOverlay extends JPanel {
         return caret >= len;
     }
 
+    /**
+     * Updates the data value.
+     */
     public void setData(List<Stop> stops, List<Stop> lines) {
         this.allStops = stops != null ? new ArrayList<>(stops) : new ArrayList<>();
         this.allLines = lines != null ? new ArrayList<>(lines) : new ArrayList<>();
     }
 
+    /**
+     * Registers callback for select.
+     */
     public void setOnSelect(Consumer<Stop> callback) {
         this.onSelect = callback;
     }
 
+    public void setOnFavoritesLoginRequired(Runnable callback) {
+        this.onFavoritesLoginRequired = callback;
+    }
+
+    /**
+     * Handles showSearch.
+     */
     public void showSearch() {
         searchField.setText("");
         currentMode = SearchMode.STOPS;
@@ -411,14 +486,17 @@ public class SearchOverlay extends JPanel {
 
         SwingUtilities.invokeLater(() -> searchField.requestFocusInWindow());
     }
-    
+
+    /**
+     * Handles showFavorites.
+     */
     public void showFavorites(List<Stop> favorites) {
         searchField.setText("");
         this.favoriteStops = favorites != null ? new ArrayList<>(favorites) : new ArrayList<>();
         currentMode = SearchMode.FAVORITES;
         updateModeButtons();
         filterResults();
-        
+
         setVisible(true);
 
         int panelW = 520;
@@ -429,7 +507,10 @@ public class SearchOverlay extends JPanel {
 
         SwingUtilities.invokeLater(() -> searchField.requestFocusInWindow());
     }
-    
+
+    /**
+     * Handles updateFavorites.
+     */
     public void updateFavorites(List<Stop> favorites) {
         this.favoriteStops = new ArrayList<>(favorites);
         if (currentMode == SearchMode.FAVORITES) {
@@ -438,6 +519,9 @@ public class SearchOverlay extends JPanel {
     }
 
     @Override
+    /**
+     * Updates the bounds value.
+     */
     public void setBounds(int x, int y, int width, int height) {
         super.setBounds(x, y, width, height);
         if (contentPanel != null && isVisible()) {
@@ -458,8 +542,48 @@ public class SearchOverlay extends JPanel {
     }
 
     @Override
+    /**
+     * Returns whether opaque.
+     */
     public boolean isOpaque() {
         return false;
+    }
+
+    private static final class CloseIcon implements Icon {
+        private final int size;
+        private final Color color;
+
+        private CloseIcon(int size, Color color) {
+            this.size = Math.max(8, size);
+            this.color = color == null ? Color.WHITE : color;
+        }
+
+        @Override
+        public int getIconWidth() {
+            return size;
+        }
+
+        @Override
+        public int getIconHeight() {
+            return size;
+        }
+
+        @Override
+        public void paintIcon(java.awt.Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+                    java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.setStroke(new java.awt.BasicStroke(
+                    2f,
+                    java.awt.BasicStroke.CAP_ROUND,
+                    java.awt.BasicStroke.JOIN_ROUND
+            ));
+            int max = size - 2;
+            g2.drawLine(x + 1, y + 1, x + max, y + max);
+            g2.drawLine(x + max, y + 1, x + 1, y + max);
+            g2.dispose();
+        }
     }
 
     private class StopCellRenderer extends JPanel implements ListCellRenderer<Stop> {
@@ -475,7 +599,7 @@ public class SearchOverlay extends JPanel {
             setLayout(new BorderLayout());
             setBorder(new EmptyBorder(10, 14, 10, 14));
             setOpaque(true);
-            
+
             yellowStarIcon = new ImageIcon(createYellowStar(16));
             busTypeIcon = loadTypeIcon("/sprites/bus.png");
             tramTypeIcon = loadTypeIcon("/sprites/tram.png");
@@ -500,7 +624,7 @@ public class SearchOverlay extends JPanel {
             textPanel.add(idLabel);
 
             add(textPanel, BorderLayout.CENTER);
-            
+
             starLabel = new JLabel();
             starLabel.setBorder(new EmptyBorder(0, 8, 0, 4));
             starLabel.setPreferredSize(new Dimension(24, 24));
@@ -516,14 +640,14 @@ public class SearchOverlay extends JPanel {
                 return null;
             }
         }
-        
+
         private Image createYellowStar(int size) {
             java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
                 size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
             java.awt.Graphics2D g2 = img.createGraphics();
-            g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, 
+            g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
                                java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-            
+
             int[] xPoints = new int[10];
             int[] yPoints = new int[10];
             double angleStep = Math.PI / 5;
@@ -538,10 +662,10 @@ public class SearchOverlay extends JPanel {
                 xPoints[i] = (int) (cx + r * Math.cos(angle));
                 yPoints[i] = (int) (cy + r * Math.sin(angle));
             }
-            
-            g2.setColor(new Color(255, 200, 50)); // Nota in italiano
+
+            g2.setColor(new Color(255, 200, 50));
             g2.fillPolygon(xPoints, yPoints, 10);
-            g2.setColor(new Color(200, 150, 0)); // Nota in italiano
+            g2.setColor(new Color(200, 150, 0));
             g2.drawPolygon(xPoints, yPoints, 10);
             g2.dispose();
             return img;
@@ -554,7 +678,7 @@ public class SearchOverlay extends JPanel {
             String name = value.getStopName();
             if (name.length() > 38) name = name.substring(0, 38) + "...";
             nameLabel.setText(name);
-            
+
             boolean isFavorite;
             if (value.isFakeLine()) {
                 VehicleType vehicleType = VehicleType.fromGtfsCode(value.getStopCode());
@@ -567,7 +691,7 @@ public class SearchOverlay extends JPanel {
                 typeLabel.setIcon(null);
                 isFavorite = FavoritesService.isFavorite(value.getStopId());
             }
-            
+
             starLabel.setIcon(isFavorite ? yellowStarIcon : null);
 
             if (isSelected) {

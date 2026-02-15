@@ -20,6 +20,7 @@ import javax.swing.SwingUtilities;
 import org.jxmapviewer.JXMapViewer;
 import org.jxmapviewer.viewer.GeoPosition;
 
+import damose.config.AppConstants;
 import damose.data.mapper.TripIdUtils;
 import damose.model.Stop;
 import damose.model.Trip;
@@ -28,9 +29,14 @@ import damose.model.BusWaypoint;
 import damose.model.VehicleType;
 import damose.view.render.RoutePainter;
 
+/**
+ * Map utility for map overlay manager.
+ */
 public class MapOverlayManager {
 
     private static final RoutePainter routePainter = new RoutePainter();
+    private static final Color BUS_ROUTE_COLOR = new Color(48, 162, 236, 225);
+    private static final Color BUS_ROUTE_OUTLINE_COLOR = new Color(0, 0, 0, 235);
 
     private static Set<String> currentStopIds = new HashSet<>();
     private static Set<String> currentBusIds = new HashSet<>();
@@ -42,16 +48,16 @@ public class MapOverlayManager {
     private static final Map<String, List<Trip>> tripByExactId = new HashMap<>();
     private static final Map<String, List<Trip>> tripByNormalizedId = new HashMap<>();
     private static List<Trip> indexedTripsRef = null;
-    
+
     private static String busRouteFilter = null;
     private static Integer busDirectionFilter = null;
-    
+
     private static boolean busesVisible = true;
 
     private static final Object lock = new Object();
     private static boolean initialized = false;
     private static JXMapViewer currentMap = null;
-    
+
     private static Image busIcon;
     private static Image busIconSmall;
     private static Image tramIcon;
@@ -61,7 +67,7 @@ public class MapOverlayManager {
 
     private MapOverlayManager() {
     }
-    
+
     private static void loadIcons() {
         try {
             ImageIcon bus = new ImageIcon(MapOverlayManager.class.getResource("/sprites/bus.png"));
@@ -78,7 +84,7 @@ public class MapOverlayManager {
         } catch (Exception e) {
             System.out.println("Failed to load tram icon: " + e.getMessage());
         }
-        
+
         try {
             ImageIcon stop = new ImageIcon(MapOverlayManager.class.getResource("/sprites/stop.png"));
             stopIcon = stop.getImage().getScaledInstance(36, 36, Image.SCALE_SMOOTH);
@@ -90,20 +96,20 @@ public class MapOverlayManager {
 
     private static void initPainters(JXMapViewer mapViewer) {
         if (initialized && currentMap == mapViewer) return;
-        
+
         loadIcons();
 
         mapViewer.setOverlayPainter((g, map, w, h) -> {
             Graphics2D g2 = (Graphics2D) g;
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            
+
             synchronized (lock) {
                 if (routePainter.hasRoute()) {
                     routePainter.paint(g2, map, w, h);
                 }
-                
+
                 drawStops(g2, map);
-                
+
                 drawBuses(g2, map);
             }
         });
@@ -111,13 +117,13 @@ public class MapOverlayManager {
         initialized = true;
         currentMap = mapViewer;
     }
-    
+
     private static void drawStops(Graphics2D g, JXMapViewer map) {
         if (visibleStops.isEmpty() && routeStops.isEmpty()) return;
-        
+
         Rectangle2D viewport = map.getViewportBounds();
         int zoom = map.getZoom();
-        
+
         int size;
         if (zoom >= 8) size = 10;
         else if (zoom >= 7) size = 14;
@@ -126,20 +132,20 @@ public class MapOverlayManager {
 
         Image icon = size <= 22 ? stopIconSmall : stopIcon;
 
-        // Explicitly selected stops are always drawn.
+
         for (Stop stop : visibleStops) {
             if (stop == null) continue;
-            
+
             GeoPosition pos = new GeoPosition(stop.getStopLat(), stop.getStopLon());
             Point2D worldPt = map.getTileFactory().geoToPixel(pos, zoom);
             int screenX = (int) (worldPt.getX() - viewport.getX());
             int screenY = (int) (worldPt.getY() - viewport.getY());
-            
+
             if (screenX < -size || screenX > map.getWidth() + size ||
                 screenY < -size || screenY > map.getHeight() + size) {
                 continue;
             }
-            
+
             if (icon != null) {
                 g.drawImage(icon, screenX - size / 2, screenY - size / 2, size, size, null);
             } else {
@@ -150,7 +156,6 @@ public class MapOverlayManager {
             }
         }
 
-        // Route stops are thinned in screen-space when zoomed out to avoid clutter.
         int minRouteDistancePx = routeStopMinDistancePx(zoom);
         List<Point2D> renderedRouteStops = new ArrayList<>();
         int lastIndex = routeStops.size() - 1;
@@ -188,39 +193,41 @@ public class MapOverlayManager {
                 renderedRouteStops.add(new Point2D.Double(screenX, screenY));
             }
         }
+
+
     }
-    
+
     private static void drawBuses(Graphics2D g, JXMapViewer map) {
         if (busWaypoints.isEmpty()) return;
-        
+
         if (!busesVisible && busRouteFilter == null) return;
-        
+
         Rectangle2D viewport = map.getViewportBounds();
         int zoom = map.getZoom();
-        
+
         int size = (zoom > 5) ? 26 : 40;
-        
+
         for (BusWaypoint wp : busWaypoints) {
             if (wp == null || wp.getPosition() == null) continue;
-            
+
             if (busRouteFilter != null && !matchesRouteFilter(busRouteFilter, wp.getRouteId())) {
                 continue;
             }
             if (busDirectionFilter != null && wp.getDirectionId() != busDirectionFilter) {
                 continue;
             }
-            
+
             Point2D worldPt = map.getTileFactory().geoToPixel(wp.getPosition(), zoom);
             int screenX = (int) (worldPt.getX() - viewport.getX());
             int screenY = (int) (worldPt.getY() - viewport.getY());
-            
+
             if (screenX < -size || screenX > map.getWidth() + size ||
                 screenY < -size || screenY > map.getHeight() + size) {
                 continue;
             }
 
             Image icon = getVehicleIcon(wp.getVehicleType(), zoom);
-            
+
             if (icon != null) {
                 g.drawImage(icon, screenX - size / 2, screenY - size / 2, null);
             } else {
@@ -260,7 +267,10 @@ public class MapOverlayManager {
         }
         return false;
     }
-    
+
+    /**
+     * Updates the bus route filter value.
+     */
     public static void setBusRouteFilter(String routeId) {
         synchronized (lock) {
             busRouteFilter = routeId;
@@ -269,12 +279,18 @@ public class MapOverlayManager {
             currentMap.repaint();
         }
     }
-    
+
+    /**
+     * Returns the result of clearBusRouteFilter.
+     */
     public static void clearBusRouteFilter() {
         setBusRouteFilter(null);
         setBusDirectionFilter(null);
     }
 
+    /**
+     * Updates the bus direction filter value.
+     */
     public static void setBusDirectionFilter(Integer directionId) {
         synchronized (lock) {
             busDirectionFilter = directionId;
@@ -284,10 +300,16 @@ public class MapOverlayManager {
         }
     }
 
+    /**
+     * Returns the result of clearBusDirectionFilter.
+     */
     public static void clearBusDirectionFilter() {
         setBusDirectionFilter(null);
     }
-    
+
+    /**
+     * Updates the buses visible value.
+     */
     public static void setBusesVisible(boolean visible) {
         synchronized (lock) {
             busesVisible = visible;
@@ -296,7 +318,10 @@ public class MapOverlayManager {
             currentMap.repaint();
         }
     }
-    
+
+    /**
+     * Returns the result of toggleBusesVisible.
+     */
     public static boolean toggleBusesVisible() {
         synchronized (lock) {
             busesVisible = !busesVisible;
@@ -306,7 +331,10 @@ public class MapOverlayManager {
         }
         return busesVisible;
     }
-    
+
+    /**
+     * Returns the result of areBusesVisible.
+     */
     public static boolean areBusesVisible() {
         return busesVisible;
     }
@@ -338,7 +366,7 @@ public class MapOverlayManager {
             List<BusWaypoint> newBusWaypoints = new ArrayList<>();
             Set<String> newBusIds = new HashSet<>();
             Set<String> seenVehicleKeys = new HashSet<>();
-            
+
             for (VehiclePosition vp : busPositions) {
                 if (vp == null || vp.getPosition() == null) continue;
 
@@ -492,6 +520,9 @@ public class MapOverlayManager {
         return filter.equalsIgnoreCase(candidate);
     }
 
+    /**
+     * Updates the visible stops value.
+     */
     public static void setVisibleStops(List<Stop> stops) {
         synchronized (lock) {
             visibleStops.clear();
@@ -500,6 +531,9 @@ public class MapOverlayManager {
         }
     }
 
+    /**
+     * Returns the result of clearVisibleStops.
+     */
     public static void clearVisibleStops() {
         synchronized (lock) {
             visibleStops.clear();
@@ -507,7 +541,17 @@ public class MapOverlayManager {
         }
     }
 
+    /**
+     * Updates the route value.
+     */
     public static void setRoute(List<Stop> stops) {
+        setRoute(stops, null);
+    }
+
+    /**
+     * Updates the route value.
+     */
+    public static void setRoute(List<Stop> stops, List<GeoPosition> shapePath) {
         synchronized (lock) {
             routeStops.clear();
             currentStopIds.clear();
@@ -520,8 +564,12 @@ public class MapOverlayManager {
             routeStops.addAll(stops);
 
             List<GeoPosition> positions = new ArrayList<>();
-            for (Stop stop : stops) {
-                positions.add(new GeoPosition(stop.getStopLat(), stop.getStopLon()));
+            if (shapePath != null && shapePath.size() >= 2) {
+                positions.addAll(shapePath);
+            } else {
+                for (Stop stop : stops) {
+                    positions.add(new GeoPosition(stop.getStopLat(), stop.getStopLon()));
+                }
             }
             routePainter.setRoute(positions);
         }
@@ -531,6 +579,27 @@ public class MapOverlayManager {
         }
     }
 
+    /**
+     * Updates route painter colors according to vehicle type.
+     */
+    public static void setRouteStyleForVehicleType(VehicleType vehicleType) {
+        synchronized (lock) {
+            if (vehicleType == VehicleType.BUS) {
+                routePainter.setRouteColor(BUS_ROUTE_COLOR);
+                routePainter.setOutlineColor(BUS_ROUTE_OUTLINE_COLOR);
+            } else {
+                routePainter.setRouteColor(AppConstants.ROUTE_COLOR);
+                routePainter.setOutlineColor(AppConstants.ROUTE_OUTLINE_COLOR);
+            }
+        }
+        if (currentMap != null) {
+            currentMap.repaint();
+        }
+    }
+
+    /**
+     * Returns the result of clearRoute.
+     */
     public static void clearRoute() {
         synchronized (lock) {
             routePainter.clearRoute();
@@ -539,12 +608,18 @@ public class MapOverlayManager {
         }
     }
 
+    /**
+     * Returns the result of hasActiveRoute.
+     */
     public static boolean hasActiveRoute() {
         synchronized (lock) {
             return routePainter.hasRoute();
         }
     }
 
+    /**
+     * Returns the result of clearAll.
+     */
     public static void clearAll() {
         clearRoute();
         clearVisibleStops();

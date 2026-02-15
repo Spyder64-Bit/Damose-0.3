@@ -10,6 +10,9 @@ import java.time.format.DateTimeFormatter;
 import damose.config.AppConstants;
 import damose.model.TripServiceCalendar;
 
+/**
+ * Static data loader for calendar loader.
+ */
 public final class CalendarLoader {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -17,10 +20,16 @@ public final class CalendarLoader {
     private CalendarLoader() {
     }
 
+    /**
+     * Returns the result of load.
+     */
     public static TripServiceCalendar load() {
         return loadFromCalendarDates(AppConstants.GTFS_CALENDAR_DATES_PATH);
     }
 
+    /**
+     * Returns the result of loadFromCalendarDates.
+     */
     public static TripServiceCalendar loadFromCalendarDates(String calendarDatesPath) {
         TripServiceCalendar calendar = new TripServiceCalendar();
 
@@ -31,7 +40,7 @@ public final class CalendarLoader {
             }
 
             try (BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-                br.readLine(); // Nota in italiano
+                br.readLine();
 
                 String line;
                 int lineNo = 1;

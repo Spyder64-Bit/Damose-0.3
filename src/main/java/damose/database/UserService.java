@@ -9,11 +9,17 @@ import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.Base64;
 
+/**
+ * Database support for user service.
+ */
 public final class UserService {
 
     private UserService() {
     }
 
+    /**
+     * Returns the result of register.
+     */
     public static boolean register(String username, String password, String email) {
         String hashedPassword = hashPassword(password);
 
@@ -40,6 +46,9 @@ public final class UserService {
         }
     }
 
+    /**
+     * Returns the result of login.
+     */
     public static User login(String username, String password) {
         String hashedPassword = hashPassword(password);
 
@@ -72,6 +81,9 @@ public final class UserService {
         return null;
     }
 
+    /**
+     * Returns the result of usernameExists.
+     */
     public static boolean usernameExists(String username) {
         String sql = "SELECT COUNT(*) FROM users WHERE username = ?";
 
@@ -89,6 +101,9 @@ public final class UserService {
         }
     }
 
+    /**
+     * Returns the result of changePassword.
+     */
     public static boolean changePassword(int userId, String oldPassword, String newPassword) {
         String oldHash = hashPassword(oldPassword);
         String newHash = hashPassword(newPassword);

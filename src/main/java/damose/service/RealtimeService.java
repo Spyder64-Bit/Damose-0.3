@@ -11,6 +11,9 @@ import com.google.transit.realtime.GtfsRealtime;
 import damose.config.AppConstants;
 import damose.model.ConnectionMode;
 
+/**
+ * Provides service logic for realtime service.
+ */
 public class RealtimeService {
 
     private static GtfsRealtime.FeedMessage latestVehiclePositions;
@@ -24,19 +27,31 @@ public class RealtimeService {
     private RealtimeService() {
     }
 
+    /**
+     * Updates the mode value.
+     */
     public static void setMode(ConnectionMode newMode) {
         mode = newMode;
     }
 
+    /**
+     * Returns the mode.
+     */
     public static ConnectionMode getMode() {
         return mode;
     }
 
+    /**
+     * Returns the result of startPolling.
+     */
     public static synchronized void startPolling() {
         stopPolling();
         timer = new Timer("GTFSRealtimeUpdater", true);
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
+            /**
+             * Handles run.
+             */
             public void run() {
                 if (mode == ConnectionMode.ONLINE) {
                     fetchRealtimeFeeds();
@@ -45,6 +60,9 @@ public class RealtimeService {
         }, 0, AppConstants.RT_UPDATE_INTERVAL_MS);
     }
 
+    /**
+     * Returns the result of stopPolling.
+     */
     public static synchronized void stopPolling() {
         if (timer != null) {
             timer.cancel();
@@ -52,13 +70,16 @@ public class RealtimeService {
         }
     }
 
+    /**
+     * Returns the result of fetchRealtimeFeeds.
+     */
     public static void fetchRealtimeFeeds() {
         try {
             GtfsRealtime.FeedMessage parsed = fetchFeedFromUrl(AppConstants.VEHICLE_POSITIONS_URL);
             if (parsed != null) {
                 latestVehiclePositions = parsed;
                 System.out.println("VehiclePositions updated: header.ts=" +
-                        (parsed.hasHeader() && parsed.getHeader().hasTimestamp() 
+                        (parsed.hasHeader() && parsed.getHeader().hasTimestamp()
                             ? parsed.getHeader().getTimestamp() : "n/a"));
             }
         } catch (Exception e) {
@@ -70,7 +91,7 @@ public class RealtimeService {
             if (parsed != null) {
                 latestTripUpdates = parsed;
                 System.out.println("TripUpdates updated: header.ts=" +
-                        (parsed.hasHeader() && parsed.getHeader().hasTimestamp() 
+                        (parsed.hasHeader() && parsed.getHeader().hasTimestamp()
                             ? parsed.getHeader().getTimestamp() : "n/a"));
                 notifyDataReceived();
             }
@@ -86,7 +107,7 @@ public class RealtimeService {
             conn = (HttpURLConnection) url.openConnection();
             conn.setConnectTimeout(AppConstants.HTTP_CONNECT_TIMEOUT_MS);
             conn.setReadTimeout(AppConstants.HTTP_READ_TIMEOUT_MS);
-            conn.setRequestProperty("User-Agent", 
+            conn.setRequestProperty("User-Agent",
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) damose-bus-tracker/1.0");
             conn.setRequestProperty("Accept", "application/x-protobuf, application/octet-stream, */*");
             conn.setRequestProperty("Accept-Encoding", "identity");
@@ -113,18 +134,30 @@ public class RealtimeService {
         }
     }
 
+    /**
+     * Returns the latest vehicle positions.
+     */
     public static GtfsRealtime.FeedMessage getLatestVehiclePositions() {
         return latestVehiclePositions;
     }
 
+    /**
+     * Returns the latest trip updates.
+     */
     public static GtfsRealtime.FeedMessage getLatestTripUpdates() {
         return latestTripUpdates;
     }
 
+    /**
+     * Returns the result of hasRealTimeData.
+     */
     public static boolean hasRealTimeData() {
         return latestTripUpdates != null || latestVehiclePositions != null;
     }
 
+    /**
+     * Registers callback for data received.
+     */
     public static void setOnDataReceived(Runnable callback) {
         onDataReceived = callback;
     }

@@ -13,6 +13,9 @@ import javax.swing.Timer;
 
 import damose.model.ConnectionMode;
 
+/**
+ * UI component for connection button.
+ */
 public class ConnectionButton extends JButton {
 
     public static final int BUTTON_WIDTH = 48;
@@ -34,7 +37,7 @@ public class ConnectionButton extends JButton {
     public ConnectionButton() {
         wifiIcon = loadScaledIcon("/sprites/wifi.png", WIFI_ICON_SIZE, Image.SCALE_SMOOTH);
         noWifiIcon = loadScaledIcon("/sprites/nowifi.png", NOWIFI_ICON_SIZE, Image.SCALE_SMOOTH);
-        // Same approach used in LoadingDialog for animated GIF.
+
         connectingIcon = loadScaledIcon("/sprites/connecting.gif", CONNECTING_ICON_SIZE, Image.SCALE_DEFAULT);
 
         setContentAreaFilled(false);
@@ -74,10 +77,16 @@ public class ConnectionButton extends JButton {
         return new ImageIcon(scaled);
     }
 
+    /**
+     * Registers callback for mode toggle.
+     */
     public void setOnModeToggle(Runnable callback) {
         this.onModeToggle = callback;
     }
 
+    /**
+     * Handles showConnecting.
+     */
     public void showConnecting() {
         SwingUtilities.invokeLater(() -> {
             isConnecting = true;
@@ -108,6 +117,9 @@ public class ConnectionButton extends JButton {
         }
     }
 
+    /**
+     * Updates the mode value.
+     */
     public void setMode(ConnectionMode mode) {
         SwingUtilities.invokeLater(() -> {
             this.currentMode = mode;
@@ -122,22 +134,31 @@ public class ConnectionButton extends JButton {
         if (currentMode == ConnectionMode.ONLINE) {
             setIcon(wifiIcon);
             setDisabledIcon(wifiIcon);
-            setToolTipText("Online - Clicca per passare offline");
+            setToolTipText("Online - Clicca per andare Offline");
         } else {
             setIcon(noWifiIcon);
             setDisabledIcon(noWifiIcon);
-            setToolTipText("Offline - Clicca per connetterti");
+            setToolTipText("Offline - Clicca per andare Online");
         }
     }
 
+    /**
+     * Returns the mode.
+     */
     public ConnectionMode getMode() {
         return currentMode;
     }
 
+    /**
+     * Updates the online value.
+     */
     public void setOnline() {
         setMode(ConnectionMode.ONLINE);
     }
 
+    /**
+     * Updates the offline value.
+     */
     public void setOffline() {
         setMode(ConnectionMode.OFFLINE);
     }

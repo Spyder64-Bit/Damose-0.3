@@ -13,6 +13,9 @@ import java.util.Set;
 import damose.model.Stop;
 import damose.database.SessionManager;
 
+/**
+ * Provides service logic for favorites service.
+ */
 public final class FavoritesService {
 
     private static final Set<String> favoriteStopIds = new HashSet<>();
@@ -24,10 +27,16 @@ public final class FavoritesService {
     private FavoritesService() {
     }
 
+    /**
+     * Returns the result of init.
+     */
     public static void init(List<Stop> allStops) {
         init(allStops, new ArrayList<>());
     }
-    
+
+    /**
+     * Returns the result of init.
+     */
     public static void init(List<Stop> allStops, List<Stop> allLines) {
         allStopsCache = new ArrayList<>(allStops);
         allLinesCache = new ArrayList<>(allLines);
@@ -35,15 +44,28 @@ public final class FavoritesService {
         loadLineFavorites();
     }
 
+    /**
+     * Registers callback for favorites changed.
+     */
     public static void setOnFavoritesChanged(Runnable callback) {
         onFavoritesChanged = callback;
     }
 
+    /**
+     * Returns whether favorite.
+     */
     public static boolean isFavorite(String stopId) {
+        if (!canPersistFavorites()) return false;
         return favoriteStopIds.contains(stopId);
     }
 
+    /**
+     * Returns the result of toggleFavorite.
+     */
     public static boolean toggleFavorite(String stopId) {
+        if (!canPersistFavorites()) {
+            return false;
+        }
         boolean result;
         if (favoriteStopIds.contains(stopId)) {
             favoriteStopIds.remove(stopId);
@@ -59,7 +81,11 @@ public final class FavoritesService {
         return result;
     }
 
+    /**
+     * Returns the result of addFavorite.
+     */
     public static void addFavorite(String stopId) {
+        if (!canPersistFavorites()) return;
         if (!favoriteStopIds.contains(stopId)) {
             favoriteStopIds.add(stopId);
             saveFavorites();
@@ -69,7 +95,11 @@ public final class FavoritesService {
         }
     }
 
+    /**
+     * Returns the result of removeFavorite.
+     */
     public static void removeFavorite(String stopId) {
+        if (!canPersistFavorites()) return;
         if (favoriteStopIds.remove(stopId)) {
             saveFavorites();
             if (onFavoritesChanged != null) {
@@ -78,7 +108,11 @@ public final class FavoritesService {
         }
     }
 
+    /**
+     * Returns the favorite stops.
+     */
     public static List<Stop> getFavoriteStops() {
+        if (!canPersistFavorites()) return new ArrayList<>();
         List<Stop> favorites = new ArrayList<>();
         for (Stop stop : allStopsCache) {
             if (favoriteStopIds.contains(stop.getStopId())) {
@@ -87,8 +121,12 @@ public final class FavoritesService {
         }
         return favorites;
     }
-    
+
+    /**
+     * Returns the favorite lines.
+     */
     public static List<Stop> getFavoriteLines() {
+        if (!canPersistFavorites()) return new ArrayList<>();
         List<Stop> favorites = new ArrayList<>();
         for (Stop line : allLinesCache) {
             if (favoriteLineIds.contains(line.getStopId())) {
@@ -97,24 +135,42 @@ public final class FavoritesService {
         }
         return favorites;
     }
-    
+
+    /**
+     * Returns the all favorites.
+     */
     public static List<Stop> getAllFavorites() {
+        if (!canPersistFavorites()) return new ArrayList<>();
         List<Stop> all = new ArrayList<>();
         all.addAll(getFavoriteStops());
         all.addAll(getFavoriteLines());
         return all;
     }
 
+    /**
+     * Returns the favorites count.
+     */
     public static int getFavoritesCount() {
+        if (!canPersistFavorites()) return 0;
         return favoriteStopIds.size() + favoriteLineIds.size();
     }
-    
-    
+
+
+    /**
+     * Returns whether line favorite.
+     */
     public static boolean isLineFavorite(String lineId) {
+        if (!canPersistFavorites()) return false;
         return favoriteLineIds.contains(lineId);
     }
-    
+
+    /**
+     * Returns the result of toggleLineFavorite.
+     */
     public static boolean toggleLineFavorite(String lineId) {
+        if (!canPersistFavorites()) {
+            return false;
+        }
         boolean result;
         if (favoriteLineIds.contains(lineId)) {
             favoriteLineIds.remove(lineId);
@@ -129,8 +185,12 @@ public final class FavoritesService {
         }
         return result;
     }
-    
+
+    /**
+     * Returns the result of addLineFavorite.
+     */
     public static void addLineFavorite(String lineId) {
+        if (!canPersistFavorites()) return;
         if (!favoriteLineIds.contains(lineId)) {
             favoriteLineIds.add(lineId);
             saveLineFavorites();
@@ -139,8 +199,12 @@ public final class FavoritesService {
             }
         }
     }
-    
+
+    /**
+     * Returns the result of removeLineFavorite.
+     */
     public static void removeLineFavorite(String lineId) {
+        if (!canPersistFavorites()) return;
         if (favoriteLineIds.remove(lineId)) {
             saveLineFavorites();
             if (onFavoritesChanged != null) {
@@ -150,11 +214,9 @@ public final class FavoritesService {
     }
 
     private static File getFavoritesFile() {
-        String username = "default";
-        if (SessionManager.isLoggedIn() && SessionManager.getCurrentUser() != null) {
-            username = SessionManager.getCurrentUser().getUsername();
-        }
-        
+        if (!canPersistFavorites()) return null;
+        String username = SessionManager.getCurrentUser().getUsername();
+
         File dir = new File(System.getProperty("user.home"), ".damose");
         if (!dir.exists()) {
             dir.mkdirs();
@@ -165,8 +227,8 @@ public final class FavoritesService {
     private static void loadFavorites() {
         favoriteStopIds.clear();
         File file = getFavoritesFile();
-        
-        if (!file.exists()) {
+
+        if (file == null || !file.exists()) {
             return;
         }
 
@@ -188,7 +250,8 @@ public final class FavoritesService {
 
     private static void saveFavorites() {
         File file = getFavoritesFile();
-        
+        if (file == null) return;
+
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
             for (String id : favoriteStopIds) {
                 writer.write(id);
@@ -198,14 +261,12 @@ public final class FavoritesService {
             System.err.println("Error saving favorites: " + e.getMessage());
         }
     }
-    
-    
+
+
     private static File getLineFavoritesFile() {
-        String username = "default";
-        if (SessionManager.isLoggedIn() && SessionManager.getCurrentUser() != null) {
-            username = SessionManager.getCurrentUser().getUsername();
-        }
-        
+        if (!canPersistFavorites()) return null;
+        String username = SessionManager.getCurrentUser().getUsername();
+
         File dir = new File(System.getProperty("user.home"), ".damose");
         if (!dir.exists()) {
             dir.mkdirs();
@@ -216,8 +277,8 @@ public final class FavoritesService {
     private static void loadLineFavorites() {
         favoriteLineIds.clear();
         File file = getLineFavoritesFile();
-        
-        if (!file.exists()) {
+
+        if (file == null || !file.exists()) {
             return;
         }
 
@@ -239,7 +300,8 @@ public final class FavoritesService {
 
     private static void saveLineFavorites() {
         File file = getLineFavoritesFile();
-        
+        if (file == null) return;
+
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
             for (String id : favoriteLineIds) {
                 writer.write(id);
@@ -248,6 +310,13 @@ public final class FavoritesService {
         } catch (java.io.IOException e) {
             System.err.println("Error saving line favorites: " + e.getMessage());
         }
+    }
+
+    /**
+     * Returns whether favorites can be persisted for current session.
+     */
+    public static boolean canPersistFavorites() {
+        return SessionManager.isLoggedIn() && SessionManager.getCurrentUser() != null;
     }
 }
 

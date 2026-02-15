@@ -23,6 +23,9 @@ import damose.service.ServiceQualityTracker;
 import damose.view.MainView;
 import damose.view.map.MapOverlayManager;
 
+/**
+ * Coordinates application flow for realtime update scheduler.
+ */
 public final class RealtimeUpdateScheduler {
 
     private Timer timer;
@@ -38,6 +41,9 @@ public final class RealtimeUpdateScheduler {
         timer = new Timer("realtime-updates", true);
         timer.scheduleAtFixedRate(new java.util.TimerTask() {
             @Override
+            /**
+             * Handles run.
+             */
             public void run() {
                 runCycle(view, trips, stopTripMapper, arrivalService, modeSupplier,
                         feedTimestampConsumer, vehiclePositionsConsumer);
@@ -45,6 +51,9 @@ public final class RealtimeUpdateScheduler {
         }, 0, 30_000);
     }
 
+    /**
+     * Handles stop.
+     */
     public void stop() {
         if (timer != null) {
             timer.cancel();

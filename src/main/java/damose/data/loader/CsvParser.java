@@ -3,11 +3,17 @@ package damose.data.loader;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Static data loader for csv parser.
+ */
 public final class CsvParser {
 
     private CsvParser() {
     }
 
+    /**
+     * Returns the result of parseLine.
+     */
     public static List<String> parseLine(String line) {
         List<String> result = new ArrayList<>();
         StringBuilder current = new StringBuilder();

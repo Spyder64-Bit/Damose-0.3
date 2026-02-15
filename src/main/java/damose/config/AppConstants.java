@@ -3,6 +3,9 @@ package damose.config;
 import java.awt.Color;
 import java.awt.Font;
 
+/**
+ * Application configuration for app constants.
+ */
 public final class AppConstants {
 
     private AppConstants() {
@@ -15,6 +18,7 @@ public final class AppConstants {
 
     public static final String GTFS_STOPS_PATH = "/gtfs_static/stops.txt";
     public static final String GTFS_TRIPS_PATH = "/gtfs_static/trips.txt";
+    public static final String GTFS_SHAPES_PATH = "/gtfs_static/shapes.txt";
     public static final String GTFS_STOP_TIMES_PATH = "/gtfs_static/stop_times.txt";
     public static final String GTFS_CALENDAR_DATES_PATH = "/gtfs_static/calendar_dates.txt";
 

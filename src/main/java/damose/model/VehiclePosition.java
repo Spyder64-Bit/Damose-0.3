@@ -2,6 +2,9 @@ package damose.model;
 
 import org.jxmapviewer.viewer.GeoPosition;
 
+/**
+ * Domain model for vehicle position.
+ */
 public class VehiclePosition {
 
     private final String tripId;
@@ -25,31 +28,52 @@ public class VehiclePosition {
         this.directionId = directionId;
     }
 
+    /**
+     * Returns the trip id.
+     */
     public String getTripId() {
         return tripId;
     }
 
+    /**
+     * Returns the vehicle id.
+     */
     public String getVehicleId() {
         return vehicleId;
     }
 
+    /**
+     * Returns the position.
+     */
     public GeoPosition getPosition() {
         return position;
     }
 
+    /**
+     * Returns the stop sequence.
+     */
     public int getStopSequence() {
         return stopSequence;
     }
 
+    /**
+     * Returns the route id.
+     */
     public String getRouteId() {
         return routeId;
     }
 
+    /**
+     * Returns the direction id.
+     */
     public int getDirectionId() {
         return directionId;
     }
 
     @Override
+    /**
+     * Returns the result of toString.
+     */
     public String toString() {
         return "Bus " + vehicleId + " trip=" + tripId +
                " route=" + routeId +
@@ -58,3 +82,4 @@ public class VehiclePosition {
                " stopSeq=" + stopSequence;
     }
 }
+

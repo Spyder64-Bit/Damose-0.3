@@ -10,6 +10,9 @@ import java.util.stream.Collectors;
 import damose.model.Trip;
 import damose.model.VehiclePosition;
 
+/**
+ * Data mapping logic for trip matcher.
+ */
 public class TripMatcher {
 
     private final Map<String, Trip> tripsById;
@@ -40,6 +43,9 @@ public class TripMatcher {
         }
     }
 
+    /**
+     * Returns the result of match.
+     */
     public Trip match(VehiclePosition vp) {
         if (vp == null) return null;
         Integer direction = vp.getDirectionId() >= 0 ? vp.getDirectionId() : null;
@@ -48,6 +54,9 @@ public class TripMatcher {
         return tripsById.get(vp.getTripId());
     }
 
+    /**
+     * Returns the result of matchByTripId.
+     */
     public Trip matchByTripId(String tripId) {
         if (tripId == null || tripId.isBlank()) return null;
 
@@ -65,6 +74,9 @@ public class TripMatcher {
         return null;
     }
 
+    /**
+     * Returns the result of matchByTripIdAndRoute.
+     */
     public Trip matchByTripIdAndRoute(String tripId, String routeId, Integer directionId) {
         if (tripId == null || tripId.isBlank()) return null;
 
@@ -133,6 +145,9 @@ public class TripMatcher {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
+    /**
+     * Returns the result of searchByRouteOrHeadsign.
+     */
     public List<Trip> searchByRouteOrHeadsign(String query) {
         String q = query.toLowerCase();
         return tripsById.values().stream()

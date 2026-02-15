@@ -4,8 +4,9 @@ import org.jxmapviewer.viewer.DefaultWaypoint;
 
 import damose.data.loader.RoutesLoader;
 
+
 /**
- * Waypoint representing a vehicle (bus, tram, metro) on the map.
+ * Domain model for bus waypoint.
  */
 public class BusWaypoint extends DefaultWaypoint {
 
@@ -23,42 +24,64 @@ public class BusWaypoint extends DefaultWaypoint {
         this.tripHeadsign = tripHeadsign;
         this.routeId = routeId;
         this.directionId = directionId;
-        
-        // Determine vehicle type from route
+
+
         Route route = RoutesLoader.getRouteById(routeId);
         if (route != null) {
             this.vehicleType = route.getVehicleType();
         } else {
-            this.vehicleType = VehicleType.BUS; // Default to bus
+            this.vehicleType = VehicleType.BUS;
         }
     }
 
+    /**
+     * Returns the trip id.
+     */
     public String getTripId() {
         return tripId;
     }
 
+    /**
+     * Returns the trip headsign.
+     */
     public String getTripHeadsign() {
         return tripHeadsign;
     }
 
+    /**
+     * Returns the vehicle id.
+     */
     public String getVehicleId() {
         return vehicleId;
     }
-    
+
+    /**
+     * Returns the route id.
+     */
     public String getRouteId() {
         return routeId;
     }
 
+    /**
+     * Returns the direction id.
+     */
     public int getDirectionId() {
         return directionId;
     }
-    
+
+    /**
+     * Returns the vehicle type.
+     */
     public VehicleType getVehicleType() {
         return vehicleType;
     }
 
     @Override
+    /**
+     * Returns the result of toString.
+     */
     public String toString() {
         return vehicleType.getEmoji() + " " + routeId + " - " + tripHeadsign + " (" + vehicleId + ")";
     }
 }
+

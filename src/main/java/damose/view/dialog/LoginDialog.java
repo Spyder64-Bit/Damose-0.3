@@ -39,6 +39,9 @@ import damose.config.AppConstants;
 import damose.database.User;
 import damose.database.UserService;
 
+/**
+ * Core class for login dialog.
+ */
 public class LoginDialog extends JFrame {
 
     private static final String SWITCH_TO_REGISTER_TEXT = "Non hai ancora un account? Registrati";
@@ -65,7 +68,7 @@ public class LoginDialog extends JFrame {
         setUndecorated(true);
         setBackground(new Color(0, 0, 0, 0));
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        
+
         try {
             Image trimmedIcon = loadTrimmedImage("/sprites/icon.png");
             if (trimmedIcon != null) {
@@ -81,9 +84,12 @@ public class LoginDialog extends JFrame {
         } catch (Exception e) {
             System.out.println("Could not load app icon: " + e.getMessage());
         }
-        
+
         addWindowListener(new WindowAdapter() {
             @Override
+            /**
+             * Handles windowClosing.
+             */
             public void windowClosing(WindowEvent e) {
                 wasCancelled = true;
                 dispose();
@@ -92,7 +98,7 @@ public class LoginDialog extends JFrame {
                 }
             }
         });
-        
+
         initComponents();
         setSize(450, 540);
         setLocationRelativeTo(parent);
@@ -100,6 +106,9 @@ public class LoginDialog extends JFrame {
         setShape(new RoundRectangle2D.Double(0, 0, 450, 540, 16, 16));
     }
 
+    /**
+     * Registers callback for complete.
+     */
     public void setOnComplete(Consumer<User> callback) {
         this.onComplete = callback;
     }
@@ -140,7 +149,7 @@ public class LoginDialog extends JFrame {
         titleRow.setOpaque(false);
         titleRow.setLayout(new BoxLayout(titleRow, BoxLayout.X_AXIS));
         titleRow.setAlignmentX(Component.CENTER_ALIGNMENT);
-        
+
         try {
             Image trimmedIcon = loadTrimmedImage("/sprites/icon.png");
             Image scaled = trimmedIcon != null
@@ -154,13 +163,13 @@ public class LoginDialog extends JFrame {
             titleRow.add(Box.createHorizontalStrut(12));
         } catch (Exception e) {
         }
-        
+
         JLabel titleLabel = new JLabel("Damose");
         titleLabel.setFont(AppConstants.FONT_TITLE);
         titleLabel.setForeground(AppConstants.TEXT_PRIMARY);
         titleLabel.setAlignmentY(Component.CENTER_ALIGNMENT);
         titleRow.add(titleLabel);
-        
+
         contentPanel.add(titleRow);
         contentPanel.add(Box.createVerticalStrut(8));
 
@@ -264,11 +273,17 @@ public class LoginDialog extends JFrame {
         closeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         closeBtn.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) { closeWithResult(null, true); }
-            public void mouseEntered(MouseEvent e) { 
-                closeBtn.setText("<html><b style='font-size:14px;color:#ff6b6b'>X</b></html>"); 
+            /**
+             * Handles mouseEntered.
+             */
+            public void mouseEntered(MouseEvent e) {
+                closeBtn.setText("<html><b style='font-size:14px;color:#ff6b6b'>X</b></html>");
             }
-            public void mouseExited(MouseEvent e) { 
-                closeBtn.setText("<html><b style='font-size:14px'>X</b></html>"); 
+            /**
+             * Handles mouseExited.
+             */
+            public void mouseExited(MouseEvent e) {
+                closeBtn.setText("<html><b style='font-size:14px'>X</b></html>");
             }
         });
 
@@ -489,11 +504,18 @@ public class LoginDialog extends JFrame {
         messageLabel.setText(msg);
     }
 
+    /**
+     * Returns the result of wasCancelled.
+     */
     public boolean wasCancelled() {
         return wasCancelled;
     }
 
+    /**
+     * Returns the logged in user.
+     */
     public User getLoggedInUser() {
         return loggedInUser;
     }
 }
+

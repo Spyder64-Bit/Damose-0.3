@@ -12,30 +12,32 @@ import java.util.Map;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 
-import org.jxmapviewer.JXMapViewer;
 import org.jxmapviewer.viewer.GeoPosition;
 
 import damose.data.loader.RoutesLoader;
+import damose.database.SessionManager;
 import damose.model.ConnectionMode;
 import damose.model.Route;
 import damose.model.Stop;
-import damose.model.Trip;
 import damose.model.VehiclePosition;
 import damose.model.VehicleType;
 import damose.service.FavoritesService;
 import damose.service.RealtimeService;
 import damose.util.MemoryManager;
 import damose.view.MainView;
-import damose.view.component.RouteSidePanel;
-import damose.view.map.MapAnimator;
 import damose.view.map.MapOverlayManager;
 
+/**
+ * Main application controller and coordination logic.
+ */
 public class MainController {
 
     private final ControllerDataLoader dataLoader = new ControllerDataLoader();
     private final RealtimeUpdateScheduler realtimeScheduler = new RealtimeUpdateScheduler();
+    private final RouteViewportNavigator routeViewport = new RouteViewportNavigator();
 
     private ControllerDataContext dataContext;
+    private RouteVehicleMarkerBuilder routeVehicleMarkerBuilder;
     private ConnectionMode mode = ConnectionMode.ONLINE;
     private MainView view;
     private volatile long currentFeedTs = Instant.now().getEpochSecond();
@@ -45,11 +47,19 @@ public class MainController {
     private volatile List<Stop> activeRoutePanelStops = Collections.emptyList();
     private volatile Integer activeRoutePanelDirection;
     private volatile String activeRoutePanelName;
+    private volatile boolean activeRoutePanelCircular;
 
+    /**
+     * Handles start.
+     */
     public void start() {
         System.out.println("Starting application...");
 
         dataContext = dataLoader.load();
+        routeVehicleMarkerBuilder = new RouteVehicleMarkerBuilder(
+                dataContext.getTripMatcher(),
+                RoutesLoader::getRouteById
+        );
 
         view = new MainView();
         view.init();
@@ -137,6 +147,10 @@ public class MainController {
 
     private void setupFloatingPanelFavorite() {
         view.setOnFavoriteToggle(() -> {
+            if (!canSaveFavorites()) {
+                showFavoritesLoginRequiredPopup();
+                return;
+            }
             String stopId = view.getFloatingPanelStopId();
             if (stopId != null) {
                 boolean isFav = FavoritesService.toggleFavorite(stopId);
@@ -157,6 +171,17 @@ public class MainController {
     private void showFavoritesDialog() {
         List<Stop> favorites = FavoritesService.getAllFavorites();
         view.showFavoritesInSearch(favorites);
+    }
+
+    private boolean canSaveFavorites() {
+        return SessionManager.isLoggedIn() && SessionManager.getCurrentUser() != null;
+    }
+
+    private void showFavoritesLoginRequiredPopup() {
+        view.showBottomNotice(
+                "Per salvare i preferiti devi creare un account.\n"
+                        + "Chiudi l'applicazione, riaprila e crea un account se vuoi usare i preferiti."
+        );
     }
 
     private void toggleConnectionMode() {
@@ -254,6 +279,7 @@ public class MainController {
             activeRoutePanelStops = Collections.emptyList();
             activeRoutePanelDirection = null;
             activeRoutePanelName = null;
+            activeRoutePanelCircular = false;
             view.hideRouteSidePanel();
             MapOverlayManager.clearRoute();
             MapOverlayManager.clearBusRouteFilter();
@@ -299,6 +325,7 @@ public class MainController {
                 handleStopSelection(stop, true);
             }
         });
+        view.setOnSearchFavoritesLoginRequired(this::showFavoritesLoginRequiredPopup);
     }
 
     private void handleStopSelection(Stop stop, boolean fromSearch) {
@@ -309,15 +336,16 @@ public class MainController {
             activeRoutePanelStops = Collections.emptyList();
             activeRoutePanelDirection = null;
             activeRoutePanelName = null;
+            activeRoutePanelCircular = false;
             view.hideRouteSidePanel();
             MapOverlayManager.clearRoute();
             MapOverlayManager.clearBusRouteFilter();
             MapOverlayManager.clearBusDirectionFilter();
             MapOverlayManager.setVisibleStops(Collections.singletonList(stop));
             if (fromSearch) {
-                centerOnStopWithBottomAnchor(stop);
+                routeViewport.centerOnStopWithBottomAnchor(view.getMapViewer(), stop);
             } else {
-                centerOnStop(stop);
+                routeViewport.centerOnStop(view.getMapViewer(), stop);
             }
             showFloatingArrivals(stop);
             refreshMapOverlay();
@@ -336,34 +364,45 @@ public class MainController {
                 List<Stop> routeStops = initialDirection == null
                         ? dataContext.getRouteService().getStopsForRoute(routeId)
                         : dataContext.getRouteService().getStopsForRouteAndDirection(routeId, initialDirection);
+                List<GeoPosition> routeShape = initialDirection == null
+                        ? dataContext.getRouteService().getShapeForRoute(routeId)
+                        : dataContext.getRouteService().getShapeForRouteAndDirection(routeId, initialDirection);
                 if (routeStops.isEmpty()) {
                     SwingUtilities.invokeLater(() -> {
                         activeRoutePanelId = null;
                         activeRoutePanelStops = Collections.emptyList();
                         activeRoutePanelDirection = null;
                         activeRoutePanelName = null;
+                        activeRoutePanelCircular = false;
                         view.hideRouteSidePanel();
                         MapOverlayManager.clearBusDirectionFilter();
                     });
                     return;
                 }
 
+                boolean circularRoute = isCircularRoute(routeStops);
+                List<Integer> effectiveDirections = normalizeDirectionsForCircular(
+                        directions, initialDirection, circularRoute
+                );
+
                 SwingUtilities.invokeLater(() -> {
                     activeRoutePanelId = routeId;
                     activeRoutePanelStops = new ArrayList<>(routeStops);
                     activeRoutePanelDirection = initialDirection;
                     activeRoutePanelName = routeName;
+                    activeRoutePanelCircular = circularRoute;
 
-                    Map<Integer, String> directionLabels = buildDirectionLabels(routeId, directions);
+                    Map<Integer, String> directionLabels = buildDirectionLabels(routeId, effectiveDirections);
                     view.setRouteSidePanelDirections(directionLabels, initialDirection != null ? initialDirection : 0);
                     view.showRouteSidePanel(routeName, routeStops);
 
                     MapOverlayManager.clearVisibleStops();
-                    MapOverlayManager.setRoute(routeStops);
+                    MapOverlayManager.setRouteStyleForVehicleType(resolveRouteVehicleType(routeId));
+                    MapOverlayManager.setRoute(routeStops, routeShape);
                     MapOverlayManager.setBusRouteFilter(routeId);
                     MapOverlayManager.setBusDirectionFilter(initialDirection);
                     refreshMapOverlay();
-                    fitMapToRoute(routeStops);
+                    routeViewport.fitMapToRoute(view.getMapViewer(), routeStops, activeRoutePanelId != null);
                     view.hideFloatingPanel();
                 });
             } catch (Exception ex) {
@@ -379,6 +418,7 @@ public class MainController {
                     activeRoutePanelStops = Collections.emptyList();
                     activeRoutePanelDirection = null;
                     activeRoutePanelName = null;
+                    activeRoutePanelCircular = false;
                     view.hideRouteSidePanel();
                     MapOverlayManager.clearBusDirectionFilter();
                 });
@@ -390,10 +430,47 @@ public class MainController {
         return value == null ? "" : value.trim();
     }
 
+    private VehicleType resolveRouteVehicleType(String routeId) {
+        Route route = RoutesLoader.getRouteById(routeId);
+        return route != null ? route.getVehicleType() : VehicleType.BUS;
+    }
+
     private Integer chooseInitialDirection(List<Integer> directions) {
         if (directions == null || directions.isEmpty()) return null;
         if (directions.contains(0)) return 0;
         return directions.get(0);
+    }
+
+    private static boolean isCircularRoute(List<Stop> routeStops) {
+        if (routeStops == null || routeStops.size() < 2) return false;
+
+        Stop first = routeStops.get(0);
+        Stop last = routeStops.get(routeStops.size() - 1);
+        if (first == null || last == null) return false;
+
+        String firstId = first.getStopId();
+        String lastId = last.getStopId();
+        if (firstId != null && lastId != null
+                && firstId.trim().equalsIgnoreCase(lastId.trim())) {
+            return true;
+        }
+
+        double latDiff = Math.abs(first.getStopLat() - last.getStopLat());
+        double lonDiff = Math.abs(first.getStopLon() - last.getStopLon());
+        return latDiff < 0.0001 && lonDiff < 0.0001;
+    }
+
+    private static List<Integer> normalizeDirectionsForCircular(List<Integer> directions,
+                                                                Integer selectedDirection,
+                                                                boolean circularRoute) {
+        if (!circularRoute || directions == null || directions.size() <= 1) {
+            return directions;
+        }
+
+        if (selectedDirection != null) {
+            return List.of(selectedDirection);
+        }
+        return List.of(directions.get(0));
     }
 
     private Map<Integer, String> buildDirectionLabels(String routeId, List<Integer> directions) {
@@ -411,167 +488,39 @@ public class MainController {
     }
 
     private void onRouteDirectionSelected(int directionId) {
+        if (activeRoutePanelCircular) return;
+
         String routeId = activeRoutePanelId;
         String routeName = activeRoutePanelName;
         if (routeId == null || routeName == null) return;
 
         new Thread(() -> {
             List<Stop> routeStops = dataContext.getRouteService().getStopsForRouteAndDirection(routeId, directionId);
+            List<GeoPosition> routeShape = dataContext.getRouteService()
+                    .getShapeForRouteAndDirection(routeId, directionId);
             if (routeStops.isEmpty()) return;
 
             SwingUtilities.invokeLater(() -> {
                 activeRoutePanelDirection = directionId;
                 activeRoutePanelStops = new ArrayList<>(routeStops);
+                activeRoutePanelCircular = isCircularRoute(routeStops);
                 view.showRouteSidePanel(routeName, routeStops);
 
                 List<Integer> directions = dataContext.getRouteService().getDirectionsForRoute(routeId);
-                view.setRouteSidePanelDirections(buildDirectionLabels(routeId, directions), directionId);
+                List<Integer> effectiveDirections = normalizeDirectionsForCircular(
+                        directions, directionId, activeRoutePanelCircular
+                );
+                view.setRouteSidePanelDirections(buildDirectionLabels(routeId, effectiveDirections), directionId);
 
                 MapOverlayManager.clearVisibleStops();
-                MapOverlayManager.setRoute(routeStops);
+                MapOverlayManager.setRouteStyleForVehicleType(resolveRouteVehicleType(routeId));
+                MapOverlayManager.setRoute(routeStops, routeShape);
                 MapOverlayManager.setBusRouteFilter(routeId);
                 MapOverlayManager.setBusDirectionFilter(directionId);
                 refreshMapOverlay();
-                fitMapToRoute(routeStops);
+                routeViewport.fitMapToRoute(view.getMapViewer(), routeStops, activeRoutePanelId != null);
             });
         }, "route-direction-" + routeId + "-" + directionId).start();
-    }
-
-    private void centerOnStop(Stop stop) {
-        if (stop.getStopLat() == 0.0 && stop.getStopLon() == 0.0) return;
-        GeoPosition pos = new GeoPosition(stop.getStopLat(), stop.getStopLon());
-        MapAnimator.flyTo(view.getMapViewer(), pos, 1, 2500, null);
-    }
-
-    private void centerOnStopWithBottomAnchor(Stop stop) {
-        if (stop.getStopLat() == 0.0 && stop.getStopLon() == 0.0) return;
-
-        JXMapViewer mapViewer = view.getMapViewer();
-        GeoPosition stopPos = new GeoPosition(stop.getStopLat(), stop.getStopLon());
-        int targetZoom = 1;
-        GeoPosition targetCenter = computeBottomThirdCenter(mapViewer, stopPos, targetZoom);
-
-        MapAnimator.flyTo(mapViewer, targetCenter, targetZoom, 2500, null);
-    }
-
-    private GeoPosition computeBottomThirdCenter(JXMapViewer mapViewer, GeoPosition stopPos, int zoom) {
-        if (mapViewer == null || mapViewer.getTileFactory() == null) {
-            return stopPos;
-        }
-
-        int mapHeight = mapViewer.getHeight();
-        if (mapHeight <= 0) {
-            return stopPos;
-        }
-
-        Point2D stopWorldPixel = mapViewer.getTileFactory().geoToPixel(stopPos, zoom);
-        double desiredStopScreenY = mapHeight * (2.0 / 3.0);
-        double centerWorldY = stopWorldPixel.getY() + (mapHeight / 2.0 - desiredStopScreenY);
-        Point2D centerWorldPixel = new Point2D.Double(stopWorldPixel.getX(), centerWorldY);
-        return mapViewer.getTileFactory().pixelToGeo(centerWorldPixel, zoom);
-    }
-
-    private void fitMapToRoute(List<Stop> routeStops) {
-        if (routeStops == null || routeStops.size() < 2) return;
-
-        JXMapViewer mapViewer = view.getMapViewer();
-        if (mapViewer == null || mapViewer.getTileFactory() == null) return;
-
-        int mapWidth = Math.max(1, mapViewer.getWidth());
-        int mapHeight = Math.max(1, mapViewer.getHeight());
-
-        int outerPaddingPx = 38;
-        int reservedRightPx = activeRoutePanelId != null ? Math.min(300, Math.max(190, mapWidth / 5)) : 0;
-
-        int usableWidth = Math.max(220, mapWidth - reservedRightPx - (outerPaddingPx * 2));
-        int usableHeight = Math.max(180, mapHeight - (outerPaddingPx * 2));
-
-        int targetZoom = findBestZoomForRoute(routeStops, mapViewer, usableWidth, usableHeight, 1, 17);
-        if (targetZoom > 1) {
-            Point2D tighterSpan = computeRouteBoundsSpan(routeStops, mapViewer, targetZoom - 1);
-            if (tighterSpan != null
-                    && tighterSpan.getX() <= usableWidth * 1.08
-                    && tighterSpan.getY() <= usableHeight * 1.08) {
-                targetZoom = targetZoom - 1;
-            }
-        }
-        Point2D boundsCenter = computeRouteBoundsCenter(routeStops, mapViewer, targetZoom);
-        if (boundsCenter == null) return;
-
-        double visibleCenterX = outerPaddingPx + usableWidth / 2.0;
-        double mapCenterX = mapWidth / 2.0;
-        double shiftToVisibleArea = mapCenterX - visibleCenterX;
-
-        Point2D targetCenterWorld = new Point2D.Double(
-                boundsCenter.getX() + shiftToVisibleArea,
-                boundsCenter.getY()
-        );
-        GeoPosition targetCenterGeo = mapViewer.getTileFactory().pixelToGeo(targetCenterWorld, targetZoom);
-
-        MapAnimator.flyTo(mapViewer, targetCenterGeo, targetZoom, 3000, null);
-    }
-
-    private int findBestZoomForRoute(List<Stop> routeStops,
-                                     JXMapViewer mapViewer,
-                                     int maxSpanX,
-                                     int maxSpanY,
-                                     int minZoom,
-                                     int maxZoom) {
-        for (int zoom = minZoom; zoom <= maxZoom; zoom++) {
-            Point2D span = computeRouteBoundsSpan(routeStops, mapViewer, zoom);
-            if (span == null) continue;
-
-            if (span.getX() <= maxSpanX && span.getY() <= maxSpanY) {
-                return zoom;
-            }
-        }
-        return maxZoom;
-    }
-
-    private Point2D computeRouteBoundsCenter(List<Stop> routeStops, JXMapViewer mapViewer, int zoom) {
-        double minX = Double.POSITIVE_INFINITY;
-        double minY = Double.POSITIVE_INFINITY;
-        double maxX = Double.NEGATIVE_INFINITY;
-        double maxY = Double.NEGATIVE_INFINITY;
-
-        for (Stop stop : routeStops) {
-            if (stop == null) continue;
-            GeoPosition pos = new GeoPosition(stop.getStopLat(), stop.getStopLon());
-            Point2D world = mapViewer.getTileFactory().geoToPixel(pos, zoom);
-            minX = Math.min(minX, world.getX());
-            minY = Math.min(minY, world.getY());
-            maxX = Math.max(maxX, world.getX());
-            maxY = Math.max(maxY, world.getY());
-        }
-
-        if (!Double.isFinite(minX) || !Double.isFinite(minY) || !Double.isFinite(maxX) || !Double.isFinite(maxY)) {
-            return null;
-        }
-
-        return new Point2D.Double((minX + maxX) / 2.0, (minY + maxY) / 2.0);
-    }
-
-    private Point2D computeRouteBoundsSpan(List<Stop> routeStops, JXMapViewer mapViewer, int zoom) {
-        double minX = Double.POSITIVE_INFINITY;
-        double minY = Double.POSITIVE_INFINITY;
-        double maxX = Double.NEGATIVE_INFINITY;
-        double maxY = Double.NEGATIVE_INFINITY;
-
-        for (Stop stop : routeStops) {
-            if (stop == null) continue;
-            GeoPosition pos = new GeoPosition(stop.getStopLat(), stop.getStopLon());
-            Point2D world = mapViewer.getTileFactory().geoToPixel(pos, zoom);
-            minX = Math.min(minX, world.getX());
-            minY = Math.min(minY, world.getY());
-            maxX = Math.max(maxX, world.getX());
-            maxY = Math.max(maxY, world.getY());
-        }
-
-        if (!Double.isFinite(minX) || !Double.isFinite(minY) || !Double.isFinite(maxX) || !Double.isFinite(maxY)) {
-            return null;
-        }
-
-        return new Point2D.Double(maxX - minX, maxY - minY);
     }
 
     private void showFloatingArrivals(Stop stop) {
@@ -608,126 +557,13 @@ public class MainController {
         String routeId = activeRoutePanelId;
         List<Stop> routeStops = activeRoutePanelStops;
         Integer directionFilter = activeRoutePanelDirection;
-        if (routeId == null || routeStops == null || routeStops.size() < 2) {
+        if (routeVehicleMarkerBuilder == null || routeId == null || routeStops == null || routeStops.size() < 2) {
             return;
         }
 
-        Map<String, RouteSidePanel.VehicleMarker> byVehicle = new LinkedHashMap<>();
-        for (VehiclePosition vp : positions) {
-            if (vp == null || vp.getPosition() == null) continue;
-
-            Integer vpDirection = vp.getDirectionId() >= 0 ? vp.getDirectionId() : null;
-            String vpRouteId = trimToNull(vp.getRouteId());
-            Trip trip = dataContext.getTripMatcher().matchByTripIdAndRoute(vp.getTripId(), vpRouteId, vpDirection);
-
-            String effectiveRouteId = vpRouteId != null ? vpRouteId : (trip != null ? trimToNull(trip.getRouteId()) : null);
-            int effectiveDirection = vpDirection != null ? vpDirection : (trip != null ? trip.getDirectionId() : -1);
-            if (!matchesRouteFilter(routeId, effectiveRouteId)) continue;
-            if (directionFilter != null && effectiveDirection != directionFilter) continue;
-
-            double progress = computeRouteProgress(vp.getPosition(), routeStops);
-            VehicleType vehicleType = resolveVehicleType(effectiveRouteId);
-            String markerId = (vp.getVehicleId() == null || vp.getVehicleId().isBlank())
-                    ? vp.getTripId()
-                    : vp.getVehicleId();
-            String routeCode = resolveRouteCode(effectiveRouteId);
-            String vehicleKind = vehicleType == VehicleType.TRAM ? "TRAM" : "BUS";
-            String markerTitle = vehicleKind;
-            int progressPct = (int) Math.round(progress * 100.0);
-            String markerDetails = "L:" + routeCode + "  ID:" + markerId + "  " + progressPct + "%";
-
-            byVehicle.put(markerId, new RouteSidePanel.VehicleMarker(
-                    progress, markerId, vehicleType, markerTitle, markerDetails));
-        }
-
-        List<RouteSidePanel.VehicleMarker> markers = new ArrayList<>(byVehicle.values());
-        markers.sort(Comparator.comparingDouble(RouteSidePanel.VehicleMarker::getProgress));
-        view.updateRouteSidePanelVehicles(markers);
-    }
-
-    private VehicleType resolveVehicleType(String routeId) {
-        Route route = RoutesLoader.getRouteById(routeId);
-        return route != null ? route.getVehicleType() : VehicleType.BUS;
-    }
-
-    private String resolveRouteCode(String routeId) {
-        Route route = RoutesLoader.getRouteById(routeId);
-        if (route == null) return routeId == null ? "" : routeId;
-        String shortName = safe(route.getRouteShortName());
-        return shortName.isEmpty() ? route.getRouteId() : shortName;
-    }
-
-    private static boolean matchesRouteFilter(String filterRouteId, String candidateRouteId) {
-        if (filterRouteId == null || candidateRouteId == null) return false;
-
-        String filter = filterRouteId.trim();
-        String candidate = candidateRouteId.trim();
-        if (filter.isEmpty() || candidate.isEmpty()) return false;
-
-        return filter.equalsIgnoreCase(candidate);
-    }
-
-    private static String trimToNull(String value) {
-        if (value == null) return null;
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private static double computeRouteProgress(GeoPosition pos, List<Stop> routeStops) {
-        if (pos == null || routeStops == null || routeStops.size() < 2) return 0.0;
-
-        double refLatRad = Math.toRadians(pos.getLatitude());
-        double cosRef = Math.max(0.2, Math.cos(refLatRad));
-
-        int n = routeStops.size();
-        double[] xs = new double[n];
-        double[] ys = new double[n];
-        for (int i = 0; i < n; i++) {
-            Stop s = routeStops.get(i);
-            xs[i] = s.getStopLon() * cosRef;
-            ys[i] = s.getStopLat();
-        }
-
-        double[] prefixLen = new double[n];
-        for (int i = 1; i < n; i++) {
-            double dx = xs[i] - xs[i - 1];
-            double dy = ys[i] - ys[i - 1];
-            prefixLen[i] = prefixLen[i - 1] + Math.hypot(dx, dy);
-        }
-
-        double total = prefixLen[n - 1];
-        if (total <= 0.0) return 0.0;
-
-        double px = pos.getLongitude() * cosRef;
-        double py = pos.getLatitude();
-        double bestDist2 = Double.MAX_VALUE;
-        double bestPathLen = 0.0;
-
-        for (int i = 0; i < n - 1; i++) {
-            double ax = xs[i];
-            double ay = ys[i];
-            double bx = xs[i + 1];
-            double by = ys[i + 1];
-            double dx = bx - ax;
-            double dy = by - ay;
-            double segLen2 = dx * dx + dy * dy;
-            if (segLen2 <= 1e-12) continue;
-
-            double t = ((px - ax) * dx + (py - ay) * dy) / segLen2;
-            t = Math.max(0.0, Math.min(1.0, t));
-
-            double qx = ax + t * dx;
-            double qy = ay + t * dy;
-            double dist2 = (px - qx) * (px - qx) + (py - qy) * (py - qy);
-
-            if (dist2 < bestDist2) {
-                bestDist2 = dist2;
-                bestPathLen = prefixLen[i] + Math.sqrt(segLen2) * t;
-            }
-        }
-
-        double progress = bestPathLen / total;
-        return Math.max(0.0, Math.min(1.0, progress));
+        view.updateRouteSidePanelVehicles(
+                routeVehicleMarkerBuilder.buildForRoute(positions, routeId, routeStops, directionFilter)
+        );
     }
 }
 

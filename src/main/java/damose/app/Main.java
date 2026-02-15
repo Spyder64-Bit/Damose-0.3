@@ -1,15 +1,19 @@
 package damose.app;
 
+
 /**
- * Submission-friendly entry point wrapper.
- * Delegates to {@link DamoseApp}.
+ * Application entry point.
  */
 public final class Main {
 
     private Main() {
     }
 
+    /**
+     * Creates a new Main instance.
+     */
     public static void main(String[] args) {
         DamoseApp.main(args);
     }
 }
+

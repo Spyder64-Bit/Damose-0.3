@@ -13,6 +13,9 @@ import damose.service.RealtimeService;
 import damose.view.dialog.LoadingDialog;
 import damose.view.dialog.LoginDialog;
 
+/**
+ * Application bootstrap for damose app.
+ */
 public class DamoseApp {
 
     private static LoadingDialog loadingDialog;
@@ -20,10 +23,13 @@ public class DamoseApp {
     private static final AtomicBoolean appStarted = new AtomicBoolean(false);
     private static final AtomicBoolean rtReady = new AtomicBoolean(false);
 
+    /**
+     * Returns the result of main.
+     */
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             LoginDialog loginDialog = new LoginDialog(null);
-            
+
             loginDialog.setOnComplete(user -> {
                 if (loginDialog.wasCancelled()) {
                     System.out.println("Login cancelled, exiting...");
@@ -41,7 +47,7 @@ public class DamoseApp {
 
                 startLoadingProcess();
             });
-            
+
             loginDialog.setVisible(true);
         });
 
@@ -148,3 +154,4 @@ public class DamoseApp {
         });
     }
 }
+

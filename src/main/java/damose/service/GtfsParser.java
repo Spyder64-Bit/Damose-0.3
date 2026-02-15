@@ -12,6 +12,9 @@ import damose.data.mapper.TripIdUtils;
 import damose.model.TripUpdateRecord;
 import damose.model.VehiclePosition;
 
+/**
+ * Provides service logic for gtfs parser.
+ */
 public final class GtfsParser {
 
     private GtfsParser() {
@@ -27,7 +30,7 @@ public final class GtfsParser {
             if (!entity.hasTripUpdate()) continue;
 
             GtfsRealtime.TripUpdate tu = entity.getTripUpdate();
-            String rawTripId = (tu.hasTrip() && tu.getTrip().hasTripId()) 
+            String rawTripId = (tu.hasTrip() && tu.getTrip().hasTripId())
                     ? tu.getTrip().getTripId() : null;
             String rawRouteId = (tu.hasTrip() && tu.getTrip().hasRouteId())
                     ? tu.getTrip().getRouteId() : null;
@@ -35,7 +38,7 @@ public final class GtfsParser {
 
             for (GtfsRealtime.TripUpdate.StopTimeUpdate stu : tu.getStopTimeUpdateList()) {
                 if (stu.hasScheduleRelationship()) {
-                    GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship rel = 
+                    GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship rel =
                             stu.getScheduleRelationship();
                     if (rel == GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED
                         || rel == GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.NO_DATA) {
@@ -80,6 +83,9 @@ public final class GtfsParser {
         return updates;
     }
 
+    /**
+     * Returns the result of parseVehiclePositions.
+     */
     public static List<VehiclePosition> parseVehiclePositions(GtfsRealtime.FeedMessage feed) {
         List<VehiclePosition> positions = new ArrayList<>();
         if (feed == null) return positions;
@@ -89,13 +95,13 @@ public final class GtfsParser {
 
             GtfsRealtime.VehiclePosition vehicle = entity.getVehicle();
 
-            String tripId = (vehicle.hasTrip() && vehicle.getTrip().hasTripId()) 
+            String tripId = (vehicle.hasTrip() && vehicle.getTrip().hasTripId())
                     ? vehicle.getTrip().getTripId() : null;
             String routeId = (vehicle.hasTrip() && vehicle.getTrip().hasRouteId())
                     ? vehicle.getTrip().getRouteId() : null;
             int directionId = (vehicle.hasTrip() && vehicle.getTrip().hasDirectionId())
                     ? vehicle.getTrip().getDirectionId() : -1;
-            String vehicleId = (vehicle.hasVehicle() && vehicle.getVehicle().hasId()) 
+            String vehicleId = (vehicle.hasVehicle() && vehicle.getVehicle().hasId())
                     ? vehicle.getVehicle().getId() : null;
 
             if (!vehicle.hasPosition()) {

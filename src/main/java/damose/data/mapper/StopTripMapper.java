@@ -13,6 +13,9 @@ import java.util.stream.Collectors;
 import damose.model.StopTime;
 import damose.model.Trip;
 
+/**
+ * Data mapping logic for stop trip mapper.
+ */
 public class StopTripMapper {
 
     private final Map<String, List<StopTime>> stopToTrips = new HashMap<>();
@@ -42,10 +45,13 @@ public class StopTripMapper {
             list.sort(Comparator.comparing(StopTime::getArrivalTime, Comparator.nullsLast(Comparator.naturalOrder())));
         }
 
-        System.out.println("StopTripMapper initialized: stopToTrips=" + stopToTrips.size() + 
+        System.out.println("StopTripMapper initialized: stopToTrips=" + stopToTrips.size() +
                           " tripSeqToStop=" + tripSeqToStop.size());
     }
 
+    /**
+     * Returns the trips for stop.
+     */
     public List<Trip> getTripsForStop(String stopId) {
         List<StopTime> times = stopToTrips.getOrDefault(stopId, Collections.emptyList());
         if (times.isEmpty() || matcher == null) return Collections.emptyList();
@@ -58,10 +64,16 @@ public class StopTripMapper {
         return result.stream().distinct().collect(Collectors.toList());
     }
 
+    /**
+     * Returns whether known stop id.
+     */
     public boolean isKnownStopId(String stopId) {
         return stopId != null && knownStopIds.contains(stopId);
     }
 
+    /**
+     * Returns the stop id by trip and sequence.
+     */
     public String getStopIdByTripAndSequence(String tripId, int sequence) {
         if (tripId == null) return null;
 
@@ -88,6 +100,9 @@ public class StopTripMapper {
         return null;
     }
 
+    /**
+     * Returns the stop times for stop.
+     */
     public List<StopTime> getStopTimesForStop(String stopId) {
         return stopToTrips.getOrDefault(stopId, Collections.emptyList());
     }

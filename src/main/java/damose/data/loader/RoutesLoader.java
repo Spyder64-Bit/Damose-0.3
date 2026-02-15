@@ -11,32 +11,41 @@ import java.util.Map;
 
 import damose.model.Route;
 
+/**
+ * Static data loader for routes loader.
+ */
 public final class RoutesLoader {
-    
+
     private static final String ROUTES_PATH = "/gtfs_static/routes.txt";
     private static Map<String, Route> routesById = new HashMap<>();
-    
+
     private RoutesLoader() {
     }
-    
+
+    /**
+     * Returns the result of load.
+     */
     public static List<Route> load() {
         return load(ROUTES_PATH);
     }
-    
+
+    /**
+     * Returns the result of load.
+     */
     public static List<Route> load(String resourcePath) {
         List<Route> routes = new ArrayList<>();
         routesById.clear();
-        
+
         try (InputStream in = RoutesLoader.class.getResourceAsStream(resourcePath)) {
             if (in == null) {
                 System.err.println("RoutesLoader: resource not found: " + resourcePath);
                 return routes;
             }
-            
+
             try (BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
                 String header = br.readLine();
                 if (header == null) return routes;
-                
+
                 String line;
                 while ((line = br.readLine()) != null) {
                     Route route = parseLine(line);
@@ -50,17 +59,17 @@ public final class RoutesLoader {
             System.err.println("Error loading routes.txt: " + e.getMessage());
             e.printStackTrace();
         }
-        
+
         System.out.println("Routes loaded: " + routes.size());
         return routes;
     }
-    
+
     private static Route parseLine(String line) {
         if (line == null || line.trim().isEmpty()) return null;
-        
+
         List<String> fields = CsvParser.parseLine(line);
         if (fields.size() < 5) return null;
-        
+
         try {
             String routeId = safeGet(fields, 0).trim();
             String agencyId = safeGet(fields, 1).trim();
@@ -69,42 +78,38 @@ public final class RoutesLoader {
             int routeType = parseRouteType(safeGet(fields, 4).trim());
             String routeColor = safeGet(fields, 6).trim();
             String textColor = safeGet(fields, 7).trim();
-            
+
             return new Route(routeId, agencyId, shortName, longName, routeType, routeColor, textColor);
         } catch (Exception e) {
             return null;
         }
     }
-    
+
     private static int parseRouteType(String s) {
-        if (s == null || s.isEmpty()) return 3; // Nota in italiano
+        if (s == null || s.isEmpty()) return 3;
         try {
             return Integer.parseInt(s);
         } catch (NumberFormatException e) {
             return 3;
         }
     }
-    
+
     private static String safeGet(List<String> list, int idx) {
         return idx < list.size() ? list.get(idx) : "";
     }
-    
+
+    /**
+     * Returns the route by id.
+     */
     public static Route getRouteById(String routeId) {
         return routesById.get(routeId);
     }
-    
+
+    /**
+     * Returns the routes by id.
+     */
     public static Map<String, Route> getRoutesById() {
         return routesById;
     }
 }
-
-
-
-
-
-
-
-
-
-
 

@@ -6,13 +6,19 @@ import org.jxmapviewer.viewer.GeoPosition;
 import damose.config.AppConstants;
 import damose.model.Stop;
 
+/**
+ * Map utility for geo utils.
+ */
 public final class GeoUtils {
 
     private GeoUtils() {
     }
 
+    /**
+     * Returns the result of haversine.
+     */
     public static double haversine(double lat1, double lon1, double lat2, double lon2) {
-        double R = 6371; // Nota in italiano
+        double R = 6371;
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);
         lat1 = Math.toRadians(lat1);
@@ -26,6 +32,9 @@ public final class GeoUtils {
         return R * c;
     }
 
+    /**
+     * Returns whether click close to stop.
+     */
     public static boolean isClickCloseToStop(JXMapViewer mapViewer, Stop stop, int clickX, int clickY) {
         var point = mapViewer.getTileFactory().geoToPixel(
                 new GeoPosition(stop.getStopLat(), stop.getStopLon()),

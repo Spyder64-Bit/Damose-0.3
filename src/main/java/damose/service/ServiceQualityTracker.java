@@ -7,6 +7,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * Provides service logic for service quality tracker.
+ */
 public class ServiceQualityTracker {
 
     private static final ServiceQualityTracker INSTANCE = new ServiceQualityTracker();
@@ -26,10 +29,16 @@ public class ServiceQualityTracker {
 
     private ServiceQualityTracker() {}
 
+    /**
+     * Returns the instance.
+     */
     public static ServiceQualityTracker getInstance() {
         return INSTANCE;
     }
 
+    /**
+     * Handles updateVehicleCount.
+     */
     public void updateVehicleCount(int count) {
         activeVehicles.set(count);
         lastUpdateTimestamp.set(Instant.now().getEpochSecond());
@@ -43,12 +52,15 @@ public class ServiceQualityTracker {
         }
     }
 
+    /**
+     * Handles recordTripDelay.
+     */
     public void recordTripDelay(String tripId, long delaySeconds) {
         tripDelays.put(tripId, delaySeconds);
 
-        if (delaySeconds > 300) { // Nota in italiano
+        if (delaySeconds > 300) {
             delayedCount.incrementAndGet();
-        } else if (delaySeconds < -120) { // Nota in italiano
+        } else if (delaySeconds < -120) {
             earlyCount.incrementAndGet();
         } else {
             onTimeCount.incrementAndGet();
@@ -63,10 +75,16 @@ public class ServiceQualityTracker {
         }
     }
 
+    /**
+     * Returns the active vehicles.
+     */
     public int getActiveVehicles() {
         return activeVehicles.get();
     }
 
+    /**
+     * Returns the average delay minutes.
+     */
     public double getAverageDelayMinutes() {
         if (tripDelays.isEmpty()) return 0.0;
         double sum = 0.0;
@@ -74,18 +92,27 @@ public class ServiceQualityTracker {
         return (sum / tripDelays.size()) / 60.0;
     }
 
+    /**
+     * Returns the on time percentage.
+     */
     public double getOnTimePercentage() {
         int total = onTimeCount.get() + delayedCount.get() + earlyCount.get();
         if (total == 0) return 100.0;
         return (onTimeCount.get() * 100.0) / total;
     }
 
+    /**
+     * Returns the seconds since last update.
+     */
     public long getSecondsSinceLastUpdate() {
         long lastTs = lastUpdateTimestamp.get();
         if (lastTs == 0) return -1;
         return Instant.now().getEpochSecond() - lastTs;
     }
 
+    /**
+     * Returns the last update time.
+     */
     public String getLastUpdateTime() {
         long lastTs = lastUpdateTimestamp.get();
         if (lastTs == 0) return "N/A";
@@ -94,16 +121,25 @@ public class ServiceQualityTracker {
         return String.format("%02d:%02d:%02d", localTime.getHour(), localTime.getMinute(), localTime.getSecond());
     }
 
+    /**
+     * Returns the total updates today.
+     */
     public int getTotalUpdatesToday() {
         return totalUpdatesToday.get();
     }
 
+    /**
+     * Returns the vehicle history.
+     */
     public List<Integer> getVehicleHistory() {
         synchronized (vehicleHistory) {
             return new ArrayList<>(vehicleHistory);
         }
     }
 
+    /**
+     * Returns the delay history.
+     */
     public List<Double> getDelayHistory() {
         synchronized (delayHistory) {
             return new ArrayList<>(delayHistory);
@@ -132,6 +168,9 @@ public class ServiceQualityTracker {
         public java.awt.Color getColor() { return color; }
     }
 
+    /**
+     * Returns the service status.
+     */
     public ServiceStatus getServiceStatus() {
         double onTime = getOnTimePercentage();
         int vehicles = activeVehicles.get();
@@ -144,6 +183,9 @@ public class ServiceQualityTracker {
         return ServiceStatus.POOR;
     }
 
+    /**
+     * Handles resetDaily.
+     */
     public void resetDaily() {
         totalUpdatesToday.set(0);
         onTimeCount.set(0);
@@ -154,3 +196,4 @@ public class ServiceQualityTracker {
         synchronized (delayHistory) { delayHistory.clear(); }
     }
 }
+

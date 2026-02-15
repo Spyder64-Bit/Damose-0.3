@@ -25,6 +25,9 @@ import javax.swing.border.EmptyBorder;
 
 import damose.config.AppConstants;
 
+/**
+ * Core class for loading dialog.
+ */
 public class LoadingDialog extends JFrame {
 
     private final JLabel statusLabel;
@@ -44,7 +47,7 @@ public class LoadingDialog extends JFrame {
         setSize(480, 400);
         setLocationRelativeTo(parent);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        
+
         try {
             ImageIcon icon = new ImageIcon(getClass().getResource("/sprites/icon.png"));
             List<Image> icons = new ArrayList<>();
@@ -77,7 +80,7 @@ public class LoadingDialog extends JFrame {
         titleRow.setOpaque(false);
         titleRow.setLayout(new BoxLayout(titleRow, BoxLayout.X_AXIS));
         titleRow.setAlignmentX(CENTER_ALIGNMENT);
-        
+
         try {
             ImageIcon rawIcon = new ImageIcon(getClass().getResource("/sprites/icon.png"));
             Image scaled = rawIcon.getImage().getScaledInstance(40, 40, Image.SCALE_SMOOTH);
@@ -91,7 +94,7 @@ public class LoadingDialog extends JFrame {
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 36));
         titleLabel.setForeground(AppConstants.TEXT_PRIMARY);
         titleRow.add(titleLabel);
-        
+
         headerPanel.add(titleRow);
 
         JLabel subtitleLabel = new JLabel("Rome Bus Tracker");
@@ -179,12 +182,12 @@ public class LoadingDialog extends JFrame {
 
         void setState(State newState) {
             this.state = newState;
-            
+
             if (animationTimer != null) {
                 animationTimer.stop();
                 animationTimer = null;
             }
-            
+
             SwingUtilities.invokeLater(() -> {
                 switch (state) {
                     case PENDING:
@@ -220,7 +223,7 @@ public class LoadingDialog extends JFrame {
                                 java.awt.MediaTracker tracker = new java.awt.MediaTracker(iconLabel);
                                 tracker.addImage(tickIcon.getImage(), 0);
                                 tracker.waitForAll();
-                                
+
                                 Image scaled = tickIcon.getImage().getScaledInstance(24, 24, Image.SCALE_SMOOTH);
                                 ImageIcon scaledIcon = new ImageIcon(scaled);
                                 iconLabel.setIcon(scaledIcon);
@@ -255,13 +258,13 @@ public class LoadingDialog extends JFrame {
             if (loadingImageCache == null) {
                 return;
             }
-            
+
             final int[] rotation = {0};
             animationTimer = new Timer(50, e -> {
                 if (state != State.ACTIVE) {
                     return;
                 }
-                
+
                 rotation[0] = (rotation[0] + 15) % 360;
                 try {
                     java.awt.image.BufferedImage rotated = rotateImage(loadingImageCache, rotation[0]);
@@ -277,12 +280,12 @@ public class LoadingDialog extends JFrame {
             double radians = Math.toRadians(angle);
             double sin = Math.abs(Math.sin(radians));
             double cos = Math.abs(Math.cos(radians));
-            
+
             int w = img.getWidth();
             int h = img.getHeight();
             int newWidth = (int) Math.floor(w * cos + h * sin);
             int newHeight = (int) Math.floor(h * cos + w * sin);
-            
+
             java.awt.image.BufferedImage rotated = new java.awt.image.BufferedImage(
                 newWidth, newHeight, java.awt.image.BufferedImage.TYPE_INT_ARGB
             );
@@ -293,7 +296,7 @@ public class LoadingDialog extends JFrame {
             g2d.rotate(radians, w / 2.0, h / 2.0);
             g2d.drawImage(img, 0, 0, null);
             g2d.dispose();
-            
+
             return rotated;
         }
 
@@ -340,6 +343,9 @@ public class LoadingDialog extends JFrame {
         }
     }
 
+    /**
+     * Updates the progress value.
+     */
     public void setProgress(int percent, String status) {
         SwingUtilities.invokeLater(() -> {
             progressPanel.setProgress(percent);
@@ -347,35 +353,56 @@ public class LoadingDialog extends JFrame {
         });
     }
 
+    /**
+     * Updates the detail value.
+     */
     public void setDetail(String detail) {
         SwingUtilities.invokeLater(() -> detailLabel.setText(detail != null ? detail : " "));
     }
 
+    /**
+     * Handles stepInitStart.
+     */
     public void stepInitStart() {
         steps[0].setState(StepIndicator.State.ACTIVE);
         setProgress(5, "Inizializzazione sistema...");
     }
 
+    /**
+     * Handles stepInitDone.
+     */
     public void stepInitDone() {
         steps[0].setState(StepIndicator.State.DONE);
         setProgress(15, "Sistema pronto");
     }
 
+    /**
+     * Handles stepStaticStart.
+     */
     public void stepStaticStart() {
         steps[1].setState(StepIndicator.State.ACTIVE);
         setProgress(20, "Caricamento dati GTFS...");
     }
 
+    /**
+     * Handles stepStaticProgress.
+     */
     public void stepStaticProgress(String item) {
         setDetail("Lettura " + item);
     }
 
+    /**
+     * Handles stepStaticDone.
+     */
     public void stepStaticDone(int stopsCount, int tripsCount) {
         steps[1].setState(StepIndicator.State.DONE);
         setProgress(50, "Dati GTFS caricati");
         setDetail(String.format("%,d fermate  |  %,d viaggi", stopsCount, tripsCount));
     }
 
+    /**
+     * Handles stepRTStart.
+     */
     public void stepRTStart(int timeoutSeconds) {
         steps[2].setState(StepIndicator.State.ACTIVE);
         setProgress(55, "Connessione feed real-time...");
@@ -394,6 +421,9 @@ public class LoadingDialog extends JFrame {
         countdownTimer.start();
     }
 
+    /**
+     * Handles stepRTDone.
+     */
     public void stepRTDone() {
         dataReceived = true;
         if (countdownTimer != null) countdownTimer.stop();
@@ -402,6 +432,9 @@ public class LoadingDialog extends JFrame {
         setDetail(null);
     }
 
+    /**
+     * Handles stepRTTimeout.
+     */
     public void stepRTTimeout() {
         if (countdownTimer != null) countdownTimer.stop();
         steps[2].setState(StepIndicator.State.WARNING);
@@ -410,22 +443,34 @@ public class LoadingDialog extends JFrame {
         setDetail("Verranno usati solo dati statici");
     }
 
+    /**
+     * Handles stepAppStart.
+     */
     public void stepAppStart() {
         steps[3].setState(StepIndicator.State.ACTIVE);
         setProgress(90, "Avvio interfaccia...");
         setDetail(null);
     }
 
+    /**
+     * Handles stepAppDone.
+     */
     public void stepAppDone() {
         steps[3].setState(StepIndicator.State.DONE);
         setProgress(100, "Pronto!");
         setDetail(null);
     }
 
+    /**
+     * Registers callback for complete.
+     */
     public void setOnComplete(Runnable callback) {
         this.onComplete = callback;
     }
 
+    /**
+     * Handles completeAndClose.
+     */
     public void completeAndClose() {
         stepAppDone();
         Timer closeTimer = new Timer(700, e -> {
@@ -439,10 +484,16 @@ public class LoadingDialog extends JFrame {
         closeTimer.start();
     }
 
+    /**
+     * Returns whether data received.
+     */
     public boolean isDataReceived() {
         return dataReceived;
     }
 
+    /**
+     * Handles closeNow.
+     */
     public void closeNow() {
         if (countdownTimer != null) {
             countdownTimer.stop();
@@ -450,3 +501,4 @@ public class LoadingDialog extends JFrame {
         dispose();
     }
 }
+

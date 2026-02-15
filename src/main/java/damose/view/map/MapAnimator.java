@@ -6,11 +6,14 @@ import javax.swing.Timer;
 import org.jxmapviewer.JXMapViewer;
 import org.jxmapviewer.viewer.GeoPosition;
 
+/**
+ * Map utility for map animator.
+ */
 public final class MapAnimator {
 
-    private static final int FRAME_INTERVAL_MS = 33; // Nota in italiano
-    private static final int FLY_DURATION_MS = 2000; // Nota in italiano
-    private static final int ZOOM_OUT_LEVELS = 3; // Nota in italiano
+    private static final int FRAME_INTERVAL_MS = 33;
+    private static final int FLY_DURATION_MS = 2000;
+    private static final int ZOOM_OUT_LEVELS = 1;
 
     private static Timer activeTimer;
     private static Runnable onCompleteCallback;
@@ -18,11 +21,14 @@ public final class MapAnimator {
     private MapAnimator() {
     }
 
+    /**
+     * Returns the result of flyTo.
+     */
     public static void flyTo(JXMapViewer mapViewer, GeoPosition targetPos, int targetZoom) {
         flyTo(mapViewer, targetPos, targetZoom, FLY_DURATION_MS, null);
     }
 
-    public static void flyTo(JXMapViewer mapViewer, GeoPosition targetPos, int targetZoom, 
+    public static void flyTo(JXMapViewer mapViewer, GeoPosition targetPos, int targetZoom,
                              int durationMs, Runnable onComplete) {
         if (!SwingUtilities.isEventDispatchThread()) {
             SwingUtilities.invokeLater(() -> flyTo(mapViewer, targetPos, targetZoom, durationMs, onComplete));
@@ -44,12 +50,12 @@ public final class MapAnimator {
         }
 
         int maxZoom = Math.max(startZoom, finalZoom);
-        int pullBackZoom = Math.min(maxZoom + ZOOM_OUT_LEVELS, 15); // Nota in italiano
+        int pullBackZoom = Math.min(maxZoom + ZOOM_OUT_LEVELS, 13);
 
         double distance = haversineDistance(startPos, targetPos);
-        if (distance > 5.0) { // Nota in italiano
-            pullBackZoom = Math.min(pullBackZoom + 2, 17);
-        } else if (distance < 0.5) { // Nota in italiano
+        if (distance > 8.0) {
+            pullBackZoom = Math.min(pullBackZoom + 1, 14);
+        } else if (distance < 0.5) {
             pullBackZoom = Math.max(pullBackZoom - 1, maxZoom);
         }
 
@@ -58,8 +64,8 @@ public final class MapAnimator {
         onCompleteCallback = onComplete;
 
         activeTimer = new Timer(FRAME_INTERVAL_MS, null);
-        activeTimer.setCoalesce(true); // Nota in italiano
-        
+        activeTimer.setCoalesce(true);
+
         activeTimer.addActionListener(e -> {
             long elapsed = System.currentTimeMillis() - startTime;
             double progress = Math.min(1.0, (double) elapsed / durationMs);
@@ -70,35 +76,35 @@ public final class MapAnimator {
             if (progress < 0.35) {
                 double phaseProgress = progress / 0.35;
                 double eased = easeOutQuad(phaseProgress);
-                
-                lat = lerp(startPos.getLatitude(), 
+
+                lat = lerp(startPos.getLatitude(),
                           (startPos.getLatitude() + targetPos.getLatitude()) / 2, eased * 0.3);
-                lon = lerp(startPos.getLongitude(), 
+                lon = lerp(startPos.getLongitude(),
                           (startPos.getLongitude() + targetPos.getLongitude()) / 2, eased * 0.3);
                 zoom = (int) Math.round(lerp(startZoom, midZoom, eased));
-                
+
             } else if (progress < 0.65) {
                 double phaseProgress = (progress - 0.35) / 0.30;
                 double eased = easeInOutSine(phaseProgress);
-                
+
                 double midLat = (startPos.getLatitude() + targetPos.getLatitude()) / 2;
                 double midLon = (startPos.getLongitude() + targetPos.getLongitude()) / 2;
-                
+
                 lat = lerp(startPos.getLatitude() + (midLat - startPos.getLatitude()) * 0.3,
                           targetPos.getLatitude() - (targetPos.getLatitude() - midLat) * 0.3, eased);
                 lon = lerp(startPos.getLongitude() + (midLon - startPos.getLongitude()) * 0.3,
                           targetPos.getLongitude() - (targetPos.getLongitude() - midLon) * 0.3, eased);
                 zoom = midZoom;
-                
+
             } else {
                 double phaseProgress = (progress - 0.65) / 0.35;
                 double eased = easeOutCubic(phaseProgress);
-                
-                double startLat = targetPos.getLatitude() - 
+
+                double startLat = targetPos.getLatitude() -
                     (targetPos.getLatitude() - (startPos.getLatitude() + targetPos.getLatitude()) / 2) * 0.3;
-                double startLon = targetPos.getLongitude() - 
+                double startLon = targetPos.getLongitude() -
                     (targetPos.getLongitude() - (startPos.getLongitude() + targetPos.getLongitude()) / 2) * 0.3;
-                
+
                 lat = lerp(startLat, targetPos.getLatitude(), eased);
                 lon = lerp(startLon, targetPos.getLongitude(), eased);
                 zoom = (int) Math.round(lerp(midZoom, finalZoom, eased));
@@ -118,6 +124,9 @@ public final class MapAnimator {
         activeTimer.start();
     }
 
+    /**
+     * Returns the result of panTo.
+     */
     public static void panTo(JXMapViewer mapViewer, GeoPosition targetPos, int durationMs) {
         if (!SwingUtilities.isEventDispatchThread()) {
             SwingUtilities.invokeLater(() -> panTo(mapViewer, targetPos, durationMs));
@@ -138,7 +147,7 @@ public final class MapAnimator {
 
         activeTimer = new Timer(FRAME_INTERVAL_MS, null);
         activeTimer.setCoalesce(true);
-        
+
         activeTimer.addActionListener(e -> {
             long elapsed = System.currentTimeMillis() - startTime;
             double progress = Math.min(1.0, (double) elapsed / durationMs);
@@ -158,14 +167,23 @@ public final class MapAnimator {
         activeTimer.start();
     }
 
+    /**
+     * Returns the result of animateTo.
+     */
     public static void animateTo(JXMapViewer mapViewer, GeoPosition targetPos, int targetZoom) {
         flyTo(mapViewer, targetPos, targetZoom);
     }
 
+    /**
+     * Returns the result of animateTo.
+     */
     public static void animateTo(JXMapViewer mapViewer, GeoPosition targetPos, int targetZoom, int durationMs) {
         flyTo(mapViewer, targetPos, targetZoom, durationMs, null);
     }
 
+    /**
+     * Returns the result of stopAnimation.
+     */
     public static void stopAnimation() {
         if (activeTimer != null) {
             activeTimer.stop();
@@ -174,6 +192,9 @@ public final class MapAnimator {
         onCompleteCallback = null;
     }
 
+    /**
+     * Returns whether animating.
+     */
     public static boolean isAnimating() {
         return activeTimer != null && activeTimer.isRunning();
     }
@@ -185,7 +206,7 @@ public final class MapAnimator {
             mapViewer.setZoom(finalZoom);
         }
         mapViewer.repaint();
-        
+
         if (onCompleteCallback != null) {
             Runnable callback = onCompleteCallback;
             onCompleteCallback = null;
@@ -217,7 +238,7 @@ public final class MapAnimator {
     }
 
     private static double haversineDistance(GeoPosition a, GeoPosition b) {
-        double R = 6371; // Nota in italiano
+        double R = 6371;
         double dLat = Math.toRadians(b.getLatitude() - a.getLatitude());
         double dLon = Math.toRadians(b.getLongitude() - a.getLongitude());
         double lat1 = Math.toRadians(a.getLatitude());
@@ -229,3 +250,4 @@ public final class MapAnimator {
         return R * c;
     }
 }
+

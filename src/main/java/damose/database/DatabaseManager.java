@@ -7,6 +7,9 @@ import java.sql.Statement;
 
 import damose.config.AppConstants;
 
+/**
+ * Database support for database manager.
+ */
 public final class DatabaseManager {
 
     private static Connection connection;
@@ -14,6 +17,9 @@ public final class DatabaseManager {
     private DatabaseManager() {
     }
 
+    /**
+     * Returns the connection.
+     */
     public static Connection getConnection() throws SQLException {
         if (connection == null || connection.isClosed()) {
             connection = DriverManager.getConnection(AppConstants.DB_URL);
@@ -21,6 +27,9 @@ public final class DatabaseManager {
         return connection;
     }
 
+    /**
+     * Returns the result of initialize.
+     */
     public static void initialize() {
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement()) {
@@ -77,6 +86,9 @@ public final class DatabaseManager {
         }
     }
 
+    /**
+     * Returns the result of close.
+     */
     public static void close() {
         try {
             if (connection != null && !connection.isClosed()) {

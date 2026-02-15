@@ -6,10 +6,15 @@ import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.RenderingHints;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -21,6 +26,7 @@ import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
+import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
@@ -33,6 +39,9 @@ import damose.config.AppConstants;
 import damose.model.Stop;
 import damose.model.VehicleType;
 
+/**
+ * UI component for route side panel.
+ */
 public class RouteSidePanel extends JPanel {
 
     public static final class VehicleMarker {
@@ -51,22 +60,37 @@ public class RouteSidePanel extends JPanel {
             this.detailText = detailText == null ? "" : detailText.trim();
         }
 
+        /**
+         * Returns the progress.
+         */
         public double getProgress() {
             return progress;
         }
 
+        /**
+         * Returns the vehicle id.
+         */
         public String getVehicleId() {
             return vehicleId;
         }
 
+        /**
+         * Returns the vehicle type.
+         */
         public VehicleType getVehicleType() {
             return vehicleType;
         }
 
+        /**
+         * Returns the title text.
+         */
         public String getTitleText() {
             return titleText;
         }
 
+        /**
+         * Returns the detail text.
+         */
         public String getDetailText() {
             return detailText;
         }
@@ -76,6 +100,7 @@ public class RouteSidePanel extends JPanel {
     private final JLabel metaLabel;
     private final JButton closeButton;
     private final JButton directionSwitchButton;
+    private final JPanel titleRow;
     private final TimelineCanvas timelineCanvas;
     private final JScrollPane scrollPane;
 
@@ -85,7 +110,10 @@ public class RouteSidePanel extends JPanel {
     private Runnable onClose;
     private IntConsumer onDirectionSelected;
     private int selectedDirection = 0;
-    private static final int ROUTE_TITLE_MAX_CHARS = 29;
+    private String routeFullName = "Linea";
+    private static final Color DIRECTION_BTN_BG = new Color(34, 40, 52, 230);
+    private static final Color DIRECTION_BTN_BG_HOVER = new Color(44, 52, 68, 235);
+    private static final Color DIRECTION_BTN_BORDER = new Color(84, 96, 116, 220);
 
     public RouteSidePanel() {
         setLayout(new BorderLayout());
@@ -97,13 +125,16 @@ public class RouteSidePanel extends JPanel {
         header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
         header.setBorder(new EmptyBorder(8, 10, 8, 10));
 
-        JPanel titleRow = new JPanel(new BorderLayout());
+        titleRow = new JPanel(new BorderLayout(8, 0));
         titleRow.setOpaque(false);
+        titleRow.setAlignmentX(LEFT_ALIGNMENT);
 
         routeLabel = new JLabel("Linea");
         routeLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
         routeLabel.setForeground(AppConstants.TEXT_PRIMARY);
         routeLabel.setAlignmentX(LEFT_ALIGNMENT);
+        routeLabel.setHorizontalAlignment(JLabel.LEFT);
+        routeLabel.setBorder(new EmptyBorder(0, 0, 0, 4));
 
         closeButton = new JButton("X");
         closeButton.setFont(new Font("Segoe UI", Font.BOLD, 12));
@@ -112,6 +143,9 @@ public class RouteSidePanel extends JPanel {
         closeButton.setContentAreaFilled(false);
         closeButton.setBorderPainted(false);
         closeButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        closeButton.setPreferredSize(new Dimension(26, 26));
+        closeButton.setMinimumSize(new Dimension(26, 26));
+        closeButton.setMaximumSize(new Dimension(26, 26));
         closeButton.setToolTipText("Chiudi ricerca linea");
         closeButton.addActionListener(e -> {
             setVisible(false);
@@ -120,13 +154,21 @@ public class RouteSidePanel extends JPanel {
             }
         });
 
-        titleRow.add(routeLabel, BorderLayout.WEST);
+        titleRow.add(routeLabel, BorderLayout.CENTER);
         titleRow.add(closeButton, BorderLayout.EAST);
+        titleRow.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                updateRouteLabelForWidth();
+            }
+        });
 
         metaLabel = new JLabel("0 fermate - 0 veicoli");
         metaLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         metaLabel.setForeground(AppConstants.TEXT_SECONDARY);
         metaLabel.setAlignmentX(LEFT_ALIGNMENT);
+        metaLabel.setHorizontalAlignment(JLabel.LEFT);
+        metaLabel.setMaximumSize(new Dimension(Integer.MAX_VALUE, metaLabel.getPreferredSize().height));
 
         header.add(titleRow);
         header.add(Box.createVerticalStrut(2));
@@ -135,17 +177,33 @@ public class RouteSidePanel extends JPanel {
 
         directionSwitchButton = new JButton("Direzione");
         directionSwitchButton.setFocusPainted(false);
-        directionSwitchButton.setBorderPainted(false);
+        directionSwitchButton.setBorderPainted(true);
         directionSwitchButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        directionSwitchButton.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        directionSwitchButton.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        directionSwitchButton.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        directionSwitchButton.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(DIRECTION_BTN_BORDER, 1),
+                BorderFactory.createEmptyBorder(6, 10, 6, 10)
+        ));
         directionSwitchButton.setContentAreaFilled(true);
         directionSwitchButton.setOpaque(true);
-        directionSwitchButton.setBackground(new Color(28, 28, 34, 220));
+        directionSwitchButton.setBackground(DIRECTION_BTN_BG);
         directionSwitchButton.setForeground(AppConstants.TEXT_PRIMARY);
         directionSwitchButton.setAlignmentX(LEFT_ALIGNMENT);
+        directionSwitchButton.setHorizontalAlignment(JButton.LEFT);
+        directionSwitchButton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
         directionSwitchButton.setVisible(false);
         directionSwitchButton.addActionListener(e -> showDirectionMenu());
+        directionSwitchButton.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                directionSwitchButton.setBackground(DIRECTION_BTN_BG_HOVER);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                directionSwitchButton.setBackground(DIRECTION_BTN_BG);
+            }
+        });
         header.add(directionSwitchButton);
         add(header, BorderLayout.NORTH);
 
@@ -160,14 +218,23 @@ public class RouteSidePanel extends JPanel {
         add(scrollPane, BorderLayout.CENTER);
     }
 
+    /**
+     * Registers callback for close.
+     */
     public void setOnClose(Runnable onClose) {
         this.onClose = onClose;
     }
 
+    /**
+     * Registers callback for direction selected.
+     */
     public void setOnDirectionSelected(IntConsumer callback) {
         this.onDirectionSelected = callback;
     }
 
+    /**
+     * Updates the direction options value.
+     */
     public void setDirectionOptions(Map<Integer, String> options, int selectedDirection) {
         directionLabels.clear();
         if (options != null) {
@@ -177,10 +244,13 @@ public class RouteSidePanel extends JPanel {
         rebuildDirectionSwitch();
     }
 
+    /**
+     * Updates the route value.
+     */
     public void setRoute(String routeName, List<Stop> stops) {
         String normalizedName = routeName == null || routeName.isBlank() ? "Linea" : routeName.trim();
-        routeLabel.setText(ellipsize(normalizedName, ROUTE_TITLE_MAX_CHARS));
-        routeLabel.setToolTipText(normalizedName);
+        routeFullName = normalizedName;
+        updateRouteLabelForWidth();
         routeStops.clear();
         if (stops != null) {
             routeStops.addAll(stops);
@@ -192,6 +262,9 @@ public class RouteSidePanel extends JPanel {
         scrollPane.getVerticalScrollBar().setValue(0);
     }
 
+    /**
+     * Updates the vehicle markers value.
+     */
     public void setVehicleMarkers(List<VehicleMarker> markers) {
         vehicleMarkers.clear();
         if (markers != null) {
@@ -203,6 +276,31 @@ public class RouteSidePanel extends JPanel {
 
     private void updateMeta() {
         metaLabel.setText(routeStops.size() + " fermate - " + vehicleMarkers.size() + " veicoli");
+    }
+
+    private void updateRouteLabelForWidth() {
+        String normalized = routeFullName == null || routeFullName.isBlank() ? "Linea" : routeFullName.trim();
+        int availableWidth = titleRow.getWidth() - closeButton.getPreferredSize().width - 14;
+        if (availableWidth <= 30) {
+            routeLabel.setText(ellipsize(normalized, 18));
+        } else {
+            FontMetrics fm = routeLabel.getFontMetrics(routeLabel.getFont());
+            routeLabel.setText(ellipsizeToWidth(normalized, fm, availableWidth));
+        }
+        routeLabel.setToolTipText(normalized);
+    }
+
+    private static String ellipsizeToWidth(String text, FontMetrics fm, int maxWidth) {
+        if (text == null || text.isEmpty()) return "";
+        if (fm.stringWidth(text) <= maxWidth) return text;
+        String suffix = "...";
+        int suffixW = fm.stringWidth(suffix);
+        if (suffixW >= maxWidth) return suffix;
+        int end = text.length();
+        while (end > 0 && fm.stringWidth(text.substring(0, end)) + suffixW > maxWidth) {
+            end--;
+        }
+        return end <= 0 ? suffix : text.substring(0, end) + suffix;
     }
 
     private static String ellipsize(String text, int maxChars) {
@@ -241,7 +339,7 @@ public class RouteSidePanel extends JPanel {
         }
 
         String selectedLabel = normalizeDirectionLabel(directionLabels.get(selectedDirection));
-        directionSwitchButton.setText(ellipsize(selectedLabel, 26) + " v");
+        directionSwitchButton.setText("v " + ellipsize(selectedLabel, 22));
         directionSwitchButton.setToolTipText(selectedLabel);
         directionSwitchButton.setVisible(true);
     }
@@ -253,8 +351,13 @@ public class RouteSidePanel extends JPanel {
         for (Map.Entry<Integer, String> entry : directionLabels.entrySet()) {
             int directionId = entry.getKey();
             String text = normalizeDirectionLabel(entry.getValue());
-            String prefix = directionId == selectedDirection ? "> " : "  ";
-            JMenuItem item = new JMenuItem(prefix + ellipsize(text, 42));
+            JMenuItem item = new JMenuItem(ellipsize(text, 36));
+            if (directionId == selectedDirection) {
+                item.setIcon(new StatusDotIcon(new Color(99, 210, 99)));
+                item.setFont(item.getFont().deriveFont(Font.BOLD));
+            } else {
+                item.setIcon(new StatusDotIcon(new Color(80, 80, 86)));
+            }
             item.addActionListener(e -> {
                 if (selectedDirection == directionId) return;
                 selectedDirection = directionId;
@@ -266,6 +369,33 @@ public class RouteSidePanel extends JPanel {
             menu.add(item);
         }
         menu.show(directionSwitchButton, 0, directionSwitchButton.getHeight());
+    }
+
+    private static final class StatusDotIcon implements Icon {
+        private final Color color;
+
+        private StatusDotIcon(Color color) {
+            this.color = color;
+        }
+
+        @Override
+        public int getIconWidth() {
+            return 10;
+        }
+
+        @Override
+        public int getIconHeight() {
+            return 10;
+        }
+
+        @Override
+        public void paintIcon(java.awt.Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.fillOval(x + 1, y + 1, 8, 8);
+            g2.dispose();
+        }
     }
 
     @Override
@@ -283,6 +413,9 @@ public class RouteSidePanel extends JPanel {
     }
 
     @Override
+    /**
+     * Returns whether opaque.
+     */
     public boolean isOpaque() {
         return false;
     }
@@ -317,6 +450,9 @@ public class RouteSidePanel extends JPanel {
         }
 
         @Override
+        /**
+         * Returns the preferred size.
+         */
         public Dimension getPreferredSize() {
             int stopCount = Math.max(2, routeStops.size());
             int routeH = TOP_PADDING + BOTTOM_PADDING + (stopCount - 1) * ROW_HEIGHT;
@@ -429,3 +565,4 @@ public class RouteSidePanel extends JPanel {
         }
     }
 }
+

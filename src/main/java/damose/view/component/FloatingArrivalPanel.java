@@ -31,6 +31,9 @@ import javax.swing.Timer;
 
 import damose.config.AppConstants;
 
+/**
+ * UI component for floating arrival panel.
+ */
 public class FloatingArrivalPanel extends JPanel {
 
     private JLabel title;
@@ -50,14 +53,14 @@ public class FloatingArrivalPanel extends JPanel {
     private String currentStopId;
     private String currentStopName;
     private boolean isFavorite;
-    
+
     private boolean viewAllMode = false;
     private List<String> normalArrivals = new ArrayList<>();
     private List<String> allTripsData = new ArrayList<>();
 
     private float alpha = 1.0f;
     private Timer fadeTimer;
-    
+
     private ImageIcon starFilledIcon;
     private ImageIcon starEmptyIcon;
 
@@ -70,7 +73,7 @@ public class FloatingArrivalPanel extends JPanel {
     public FloatingArrivalPanel() {
         setLayout(null);
         setOpaque(false);
-        
+
         loadStarIcons();
 
         content = new JPanel(new BorderLayout());
@@ -97,7 +100,7 @@ public class FloatingArrivalPanel extends JPanel {
         favoriteButton.setBorderPainted(false);
         favoriteButton.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
         favoriteButton.setPreferredSize(new Dimension(28, 28));
-        favoriteButton.setIcon(starFilledIcon); // Nota in italiano
+        favoriteButton.setIcon(starFilledIcon);
         favoriteButton.setToolTipText("Aggiungi ai preferiti");
         favoriteButton.addActionListener(e -> {
             if (onFavoriteToggle != null) {
@@ -145,7 +148,7 @@ public class FloatingArrivalPanel extends JPanel {
         footerPanel.setLayout(new BoxLayout(footerPanel, BoxLayout.Y_AXIS));
         footerPanel.setOpaque(false);
         footerPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 4, 0));
-        
+
         viewAllButton = new JButton(">> Vedi tutti i passaggi del giorno");
         viewAllButton.setFont(SMALL_FONT);
         viewAllButton.setForeground(AppConstants.ACCENT);
@@ -158,7 +161,7 @@ public class FloatingArrivalPanel extends JPanel {
                 onViewAllTrips.run();
             }
         });
-        
+
         backButton = new JButton("<< Torna agli arrivi");
         backButton.setFont(SMALL_FONT);
         backButton.setForeground(AppConstants.ACCENT);
@@ -168,7 +171,7 @@ public class FloatingArrivalPanel extends JPanel {
         backButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         backButton.setVisible(false);
         backButton.addActionListener(e -> showNormalView());
-        
+
         footerPanel.add(viewAllButton);
         footerPanel.add(backButton);
 
@@ -180,51 +183,75 @@ public class FloatingArrivalPanel extends JPanel {
         setVisible(false);
     }
 
+    /**
+     * Registers callback for close.
+     */
     public void setOnClose(Runnable r) {
         this.onClose = r;
     }
-    
+
+    /**
+     * Registers callback for favorite toggle.
+     */
     public void setOnFavoriteToggle(Runnable r) {
         this.onFavoriteToggle = r;
     }
-    
+
+    /**
+     * Registers callback for view all trips.
+     */
     public void setOnViewAllTrips(Runnable r) {
         this.onViewAllTrips = r;
     }
 
+    /**
+     * Updates the preferred rows max value.
+     */
     public void setPreferredRowsMax(int max) {
         this.maxRows = Math.max(1, max);
     }
-    
+
+    /**
+     * Returns the current stop id.
+     */
     public String getCurrentStopId() {
         return currentStopId;
     }
-    
+
+    /**
+     * Returns the stop name.
+     */
     public String getStopName() {
         return currentStopName;
     }
-    
+
+    /**
+     * Updates the favorite status value.
+     */
     public void setFavoriteStatus(boolean favorite) {
         this.isFavorite = favorite;
         if (favorite) {
-            favoriteButton.setIcon(starEmptyIcon); // Nota in italiano
+            favoriteButton.setIcon(starEmptyIcon);
             favoriteButton.setToolTipText("Rimuovi dai preferiti");
         } else {
-            favoriteButton.setIcon(starFilledIcon); // Nota in italiano
+            favoriteButton.setIcon(starFilledIcon);
             favoriteButton.setToolTipText("Aggiungi ai preferiti");
         }
     }
-    
+
+    /**
+     * Handles showAllTripsView.
+     */
     public void showAllTripsView(List<String> allTrips) {
         this.allTripsData = new ArrayList<>(allTrips);
         this.viewAllMode = true;
-        
+
         title.setText("Passaggi del giorno (" + allTrips.size() + ")");
         viewAllButton.setVisible(false);
         backButton.setVisible(true);
-        
+
         arrivalsList.removeAll();
-        
+
         if (allTrips.isEmpty()) {
             JLabel noData = new JLabel("Nessun passaggio programmato");
             noData.setForeground(AppConstants.TEXT_SECONDARY);
@@ -240,39 +267,42 @@ public class FloatingArrivalPanel extends JPanel {
                 label.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
                 label.setMaximumSize(new Dimension(AppConstants.FLOATING_PANEL_WIDTH - 40, 70));
                 label.setVerticalTextPosition(JLabel.TOP);
-                
+
                 if (trip.contains("[+") || trip.contains("ritardo")) {
                     label.setForeground(AppConstants.ERROR_COLOR);
                 } else if (trip.contains("[-") || trip.contains("[OK]")) {
                     label.setForeground(AppConstants.SUCCESS_COLOR);
                 }
-                
+
                 arrivalsList.add(label);
             }
         }
-        
+
         int visibleRows = Math.min(Math.max(allTrips.size(), 1), 12);
         arrivalsList.revalidate();
         updatePanelSizeForTrips(visibleRows);
     }
-    
+
+    /**
+     * Handles showNormalView.
+     */
     public void showNormalView() {
         viewAllMode = false;
-        
+
         String safeName = currentStopName == null ? "" : currentStopName;
         String displayName = safeName.length() > 25 ? safeName.substring(0, 25) + "..." : safeName;
         title.setText("Arrivi a " + displayName);
-        
+
         viewAllButton.setVisible(true);
         backButton.setVisible(false);
-        
+
         arrivalsList.removeAll();
         displayArrivals(normalArrivals);
-        
+
         arrivalsList.revalidate();
         updatePanelSize(Math.min(normalArrivals.size(), maxRows));
     }
-    
+
     private void displayArrivals(List<String> arrivals) {
         for (String a : arrivals) {
             Color dotColor = Color.WHITE;
@@ -297,34 +327,34 @@ public class FloatingArrivalPanel extends JPanel {
             arrivalsList.add(label);
         }
     }
-    
+
     private void updatePanelSize(int rows) {
         int rowHeight = 44;
         int headerHeight = 50;
         int footerHeight = 40;
         int padding = 10;
-        
+
         int scrollHeight = Math.max(rows * rowHeight, rowHeight);
         int contentHeight = headerHeight + scrollHeight + footerHeight + padding;
-        
+
         applyPanelSize(contentHeight, scrollHeight);
     }
-    
+
     private void updatePanelSizeForTrips(int rows) {
-        int rowHeight = 30; // Nota in italiano
+        int rowHeight = 30;
         int headerHeight = 50;
         int footerHeight = 40;
         int padding = 10;
-        
+
         int scrollHeight = Math.max(rows * rowHeight, rowHeight);
         int contentHeight = headerHeight + scrollHeight + footerHeight + padding;
-        
+
         scrollHeight = Math.min(Math.max(scrollHeight, 80), 150);
         contentHeight = headerHeight + scrollHeight + footerHeight + padding;
-        
+
         applyPanelSize(contentHeight, scrollHeight);
     }
-    
+
     private void applyPanelSize(int contentHeight, int scrollHeight) {
         int fixedSectionHeight = Math.max(0, contentHeight - scrollHeight);
         int maxHeight = resolvePanelMaxHeight();
@@ -334,20 +364,20 @@ public class FloatingArrivalPanel extends JPanel {
 
         content.setBounds(0, 0, AppConstants.FLOATING_PANEL_WIDTH, clampedContentHeight);
         scrollPane.setPreferredSize(new Dimension(
-                AppConstants.FLOATING_PANEL_WIDTH - 28, 
+                AppConstants.FLOATING_PANEL_WIDTH - 28,
                 clampedScrollHeight));
         scrollPane.setMaximumSize(new Dimension(
-                AppConstants.FLOATING_PANEL_WIDTH - 28, 
+                AppConstants.FLOATING_PANEL_WIDTH - 28,
                 clampedScrollHeight));
-        
+
         setPreferredSize(new Dimension(AppConstants.FLOATING_PANEL_WIDTH, clampedContentHeight));
         setSize(AppConstants.FLOATING_PANEL_WIDTH, clampedContentHeight);
-        
+
         content.revalidate();
         content.repaint();
         revalidate();
         repaint();
-        
+
         if (getParent() != null) {
             getParent().revalidate();
             getParent().repaint();
@@ -361,30 +391,30 @@ public class FloatingArrivalPanel extends JPanel {
         int parentHeightCap = Math.max(220, getParent().getHeight() - 20);
         return Math.min(MAX_PANEL_HEIGHT, parentHeightCap);
     }
-    
+
     private void loadStarIcons() {
         try {
             ImageIcon starIcon = new ImageIcon(getClass().getResource("/sprites/star.png"));
             Image scaled = starIcon.getImage().getScaledInstance(22, 22, Image.SCALE_SMOOTH);
-            
+
             starFilledIcon = new ImageIcon(scaled);
-            
+
             starEmptyIcon = new ImageIcon(createOutlineImage(starIcon.getImage(), 22));
-            
+
         } catch (Exception e) {
             System.out.println("Could not load star icons: " + e.getMessage());
             starFilledIcon = null;
             starEmptyIcon = null;
         }
     }
-    
+
     private Image createOutlineImage(Image ignoredSrc, int size) {
         java.awt.image.BufferedImage outline = new java.awt.image.BufferedImage(
             size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2 = outline.createGraphics();
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        
+
         int[] xPoints = new int[10];
         int[] yPoints = new int[10];
         double angleStep = Math.PI / 5;
@@ -399,10 +429,10 @@ public class FloatingArrivalPanel extends JPanel {
             xPoints[i] = (int) (cx + r * Math.cos(angle));
             yPoints[i] = (int) (cy + r * Math.sin(angle));
         }
-        
-        g2.setColor(new Color(255, 200, 50)); // Nota in italiano
+
+        g2.setColor(new Color(255, 200, 50));
         g2.fillPolygon(xPoints, yPoints, 10);
-        g2.setColor(new Color(200, 150, 0)); // Nota in italiano
+        g2.setColor(new Color(200, 150, 0));
         g2.setStroke(new BasicStroke(1f));
         g2.drawPolygon(xPoints, yPoints, 10);
         g2.dispose();
@@ -419,6 +449,9 @@ public class FloatingArrivalPanel extends JPanel {
         }
 
         @Override
+        /**
+         * Handles paintIcon.
+         */
         public void paintIcon(Component c, Graphics g, int x, int y) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -428,11 +461,17 @@ public class FloatingArrivalPanel extends JPanel {
         }
 
         @Override
+        /**
+         * Returns the icon width.
+         */
         public int getIconWidth() {
             return size;
         }
 
         @Override
+        /**
+         * Returns the icon height.
+         */
         public int getIconHeight() {
             return size;
         }
@@ -448,6 +487,9 @@ public class FloatingArrivalPanel extends JPanel {
         }
 
         @Override
+        /**
+         * Handles paintIcon.
+         */
         public void paintIcon(Component c, Graphics g, int x, int y) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -460,30 +502,39 @@ public class FloatingArrivalPanel extends JPanel {
         }
 
         @Override
+        /**
+         * Returns the icon width.
+         */
         public int getIconWidth() {
             return size;
         }
 
         @Override
+        /**
+         * Returns the icon height.
+         */
         public int getIconHeight() {
             return size;
         }
     }
 
+    /**
+     * Handles update.
+     */
     public void update(String stopName, String stopId, List<String> arrivi, boolean isFavorite) {
         this.currentStopId = stopId;
         this.currentStopName = stopName;
         this.normalArrivals = new ArrayList<>(arrivi);
         this.viewAllMode = false;
         setFavoriteStatus(isFavorite);
-        
+
         String safeName = stopName == null ? "" : stopName;
         String displayName = safeName.length() > 25 ? safeName.substring(0, 25) + "..." : safeName;
         title.setText("Arrivi a " + displayName);
 
         viewAllButton.setVisible(true);
         backButton.setVisible(false);
-        
+
         arrivalsList.removeAll();
         displayArrivals(arrivi);
 
@@ -492,6 +543,9 @@ public class FloatingArrivalPanel extends JPanel {
         updatePanelSize(rows);
     }
 
+    /**
+     * Handles fadeIn.
+     */
     public void fadeIn(int durationMs, int steps) {
         stopFade();
         alpha = 0f;
@@ -518,6 +572,9 @@ public class FloatingArrivalPanel extends JPanel {
     }
 
     @Override
+    /**
+     * Handles paint.
+     */
     public void paint(Graphics g) {
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -561,6 +618,9 @@ public class FloatingArrivalPanel extends JPanel {
         g2.dispose();
     }
 
+    /**
+     * Returns the preferred panel size.
+     */
     public Dimension getPreferredPanelSize() {
         Rectangle cb = content.getBounds();
         if (cb.width == 0) return new Dimension(AppConstants.FLOATING_PANEL_WIDTH, 160);

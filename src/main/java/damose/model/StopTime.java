@@ -2,6 +2,9 @@ package damose.model;
 
 import java.time.LocalTime;
 
+/**
+ * Domain model for stop time.
+ */
 public class StopTime {
 
     private final String tripId;
@@ -30,48 +33,82 @@ public class StopTime {
         this.timepoint = timepoint;
     }
 
+    /**
+     * Returns the trip id.
+     */
     public String getTripId() {
         return tripId;
     }
 
+    /**
+     * Returns the arrival time.
+     */
     public LocalTime getArrivalTime() {
         return arrivalTime;
     }
 
+    /**
+     * Returns the departure time.
+     */
     public LocalTime getDepartureTime() {
         return departureTime;
     }
 
+    /**
+     * Returns the stop id.
+     */
     public String getStopId() {
         return stopId;
     }
 
+    /**
+     * Returns the stop sequence.
+     */
     public int getStopSequence() {
         return stopSequence;
     }
 
+    /**
+     * Returns the stop headsign.
+     */
     public String getStopHeadsign() {
         return stopHeadsign;
     }
 
+    /**
+     * Returns the pickup type.
+     */
     public int getPickupType() {
         return pickupType;
     }
 
+    /**
+     * Returns the drop off type.
+     */
     public int getDropOffType() {
         return dropOffType;
     }
 
+    /**
+     * Returns the shape dist traveled.
+     */
     public double getShapeDistTraveled() {
         return shapeDistTraveled;
     }
 
+    /**
+     * Returns the timepoint.
+     */
     public int getTimepoint() {
         return timepoint;
     }
 
     @Override
+    /**
+     * Returns the result of toString.
+     */
     public String toString() {
-        return tripId + " @ " + stopId + " â†’ " + arrivalTime;
+        return tripId + " @ " + stopId + " ???????? " + arrivalTime;
     }
 }
+

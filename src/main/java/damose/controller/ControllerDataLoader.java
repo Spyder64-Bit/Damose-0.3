@@ -4,6 +4,7 @@ import java.util.List;
 
 import damose.data.loader.CalendarLoader;
 import damose.data.loader.RoutesLoader;
+import damose.data.loader.ShapesLoader;
 import damose.data.loader.StopTimesLoader;
 import damose.data.loader.StopsLoader;
 import damose.data.loader.TripsLoader;
@@ -15,23 +16,31 @@ import damose.model.Trip;
 import damose.model.TripServiceCalendar;
 import damose.service.ArrivalService;
 import damose.service.RouteService;
+import org.jxmapviewer.viewer.GeoPosition;
 
+/**
+ * Coordinates application flow for controller data loader.
+ */
 public final class ControllerDataLoader {
 
+    /**
+     * Returns the result of load.
+     */
     public ControllerDataContext load() {
         System.out.println("Caricamento dati statici...");
 
         List<Stop> stops = StopsLoader.load();
         List<Trip> trips = TripsLoader.load();
         List<StopTime> stopTimes = StopTimesLoader.load();
-        RoutesLoader.load(); 
+        java.util.Map<String, List<GeoPosition>> shapesById = ShapesLoader.load();
+        RoutesLoader.load();
 
         System.out.println("Stops loaded: " + (stops == null ? 0 : stops.size()));
         System.out.println("Trips loaded: " + (trips == null ? 0 : trips.size()));
 
         TripMatcher matcher = new TripMatcher(trips);
         StopTripMapper stopTripMapper = new StopTripMapper(stopTimes, matcher);
-        RouteService routeService = new RouteService(trips, stopTimes, stops);
+        RouteService routeService = new RouteService(trips, stopTimes, stops, shapesById);
 
         TripServiceCalendar calendar;
         try {

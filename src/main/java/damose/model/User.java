@@ -2,6 +2,9 @@ package damose.model;
 
 import java.time.LocalDateTime;
 
+/**
+ * Domain model for user.
+ */
 public class User {
 
     private int id;
@@ -16,24 +19,40 @@ public class User {
         this.createdAt = createdAt;
     }
 
+    /**
+     * Returns the id.
+     */
     public int getId() {
         return id;
     }
 
+    /**
+     * Returns the username.
+     */
     public String getUsername() {
         return username;
     }
 
+    /**
+     * Returns the email.
+     */
     public String getEmail() {
         return email;
     }
 
+    /**
+     * Returns the created at.
+     */
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
     @Override
+    /**
+     * Returns the result of toString.
+     */
     public String toString() {
         return "User{id=" + id + ", username='" + username + "'}";
     }
 }
+

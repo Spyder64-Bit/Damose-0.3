@@ -10,15 +10,24 @@ import java.util.List;
 import damose.config.AppConstants;
 import damose.model.Trip;
 
+/**
+ * Static data loader for trips loader.
+ */
 public final class TripsLoader {
 
     private TripsLoader() {
     }
 
+    /**
+     * Returns the result of load.
+     */
     public static List<Trip> load() {
         return load(AppConstants.GTFS_TRIPS_PATH);
     }
 
+    /**
+     * Returns the result of load.
+     */
     public static List<Trip> load(String resourcePath) {
         List<Trip> trips = new ArrayList<>();
 
@@ -32,10 +41,10 @@ public final class TripsLoader {
                 String line = br.readLine();
                 if (line == null) return trips;
 
-                boolean headerConsumed = line.toLowerCase().startsWith("route_id") 
-                        || line.toLowerCase().startsWith("service_id") 
+                boolean headerConsumed = line.toLowerCase().startsWith("route_id")
+                        || line.toLowerCase().startsWith("service_id")
                         || line.toLowerCase().contains("trip_id");
-                
+
                 if (!headerConsumed) {
                     processLine(line, trips);
                 }
@@ -57,7 +66,7 @@ public final class TripsLoader {
         if (line == null || line.trim().isEmpty()) return;
 
         List<String> fields = CsvParser.parseLine(line);
-        
+
         if (fields.size() < 3) return;
 
         try {

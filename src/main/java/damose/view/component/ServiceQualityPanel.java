@@ -29,6 +29,9 @@ import damose.config.AppConstants;
 import damose.service.ServiceQualityTracker;
 import damose.service.ServiceQualityTracker.ServiceStatus;
 
+/**
+ * UI component for service quality panel.
+ */
 public class ServiceQualityPanel extends JPanel {
 
     private static final Color BG_COLOR = AppConstants.OVERLAY_CARD_BG;
@@ -86,18 +89,18 @@ public class ServiceQualityPanel extends JPanel {
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
         statusLabel = createLabel("", 16, true);
-        statusLabel.setPreferredSize(new Dimension(18, 30)); // Nota in italiano
+        statusLabel.setPreferredSize(new Dimension(18, 30));
         statusLabel.setVerticalAlignment(JLabel.CENTER);
         statusLabel.setHorizontalAlignment(JLabel.CENTER);
         gbc.gridx = 0; gbc.gridy = 0; gbc.gridheight = 2;
-        gbc.fill = GridBagConstraints.NONE; // Nota in italiano
+        gbc.fill = GridBagConstraints.NONE;
         mainPanel.add(statusLabel, gbc);
 
         vehicleCountLabel = createLabel("-- Bus", 13, true);
-        gbc.gridx = 1; gbc.gridy = 0; gbc.gridheight = 1; 
+        gbc.gridx = 1; gbc.gridy = 0; gbc.gridheight = 1;
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.weightx = 1.0; // Nota in italiano
+        gbc.weightx = 1.0;
         mainPanel.add(vehicleCountLabel, gbc);
 
         delayLabel = createLabel("-- min", 11, false);
@@ -111,7 +114,7 @@ public class ServiceQualityPanel extends JPanel {
         gbc.gridx = 2; gbc.gridy = 0; gbc.gridheight = 2;
         gbc.insets = new Insets(1, 6, 1, 3);
         gbc.fill = GridBagConstraints.NONE;
-        gbc.weightx = 0.0; // Nota in italiano
+        gbc.weightx = 0.0;
         mainPanel.add(vehicleChart, gbc);
 
         detailsPanel = createDetailsPanel();
@@ -163,7 +166,7 @@ public class ServiceQualityPanel extends JPanel {
         panel.add(lastUpdateLabel, gbc);
 
         gbc.gridx = 0; gbc.gridy = 1;
-        panel.add(createLabel("PuntualitÃƒÂ :", 10, false), gbc);
+        panel.add(createLabel("Puntualit????????:", 10, false), gbc);
 
         JLabel onTimeLabel = createLabel("--%", 10, true);
         gbc.gridx = 1;
@@ -186,12 +189,15 @@ public class ServiceQualityPanel extends JPanel {
         repaint();
     }
 
+    /**
+     * Handles refresh.
+     */
     public void refresh() {
         ServiceQualityTracker tracker = ServiceQualityTracker.getInstance();
 
         ServiceStatus status = tracker.getServiceStatus();
         statusLabel.setIcon(new DotIcon(12, status.getColor()));
-        statusLabel.setText(""); // Nota in italiano
+        statusLabel.setText("");
         statusLabel.setToolTipText(status.getDescription());
 
         int vehicles = tracker.getActiveVehicles();
@@ -218,6 +224,9 @@ public class ServiceQualityPanel extends JPanel {
         updateTimer = new Timer("service-quality-refresh", true);
         updateTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
+            /**
+             * Handles run.
+             */
             public void run() {
                 SwingUtilities.invokeLater(() -> refresh());
             }
@@ -234,6 +243,9 @@ public class ServiceQualityPanel extends JPanel {
         }
 
         @Override
+        /**
+         * Handles paintIcon.
+         */
         public void paintIcon(java.awt.Component c, Graphics g, int x, int y) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -310,7 +322,11 @@ public class ServiceQualityPanel extends JPanel {
     }
 
     @Override
+    /**
+     * Returns the preferred size.
+     */
     public Dimension getPreferredSize() {
         return new Dimension(300, expanded ? 110 : 60);
     }
 }
+

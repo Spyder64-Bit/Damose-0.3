@@ -12,15 +12,24 @@ import java.util.List;
 import damose.config.AppConstants;
 import damose.model.StopTime;
 
+/**
+ * Static data loader for stop times loader.
+ */
 public final class StopTimesLoader {
 
     private StopTimesLoader() {
     }
 
+    /**
+     * Returns the result of load.
+     */
     public static List<StopTime> load() {
         return load(AppConstants.GTFS_STOP_TIMES_PATH);
     }
 
+    /**
+     * Returns the result of load.
+     */
     public static List<StopTime> load(String resourcePath) {
         List<StopTime> result = new ArrayList<>();
 
@@ -43,7 +52,7 @@ public final class StopTimesLoader {
                     List<String> parts = parseCsvLineFast(line);
                     if (parts.size() < 5) continue;
 
-                    String tripId = safeGet(parts, 0).trim().intern(); // Nota in italiano
+                    String tripId = safeGet(parts, 0).trim().intern();
                     LocalTime arrival = parseTime(safeGet(parts, 1).trim());
                     LocalTime departure = parseTime(safeGet(parts, 2).trim());
                     String stopId = safeGet(parts, 3).trim().intern();
