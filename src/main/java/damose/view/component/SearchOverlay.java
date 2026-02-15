@@ -4,32 +4,24 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Image;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
 import javax.swing.BorderFactory;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.DefaultListModel;
-import javax.swing.Icon;
-import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
-import javax.swing.ListCellRenderer;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
@@ -38,28 +30,26 @@ import javax.swing.event.DocumentListener;
 import damose.config.AppConstants;
 import damose.database.SessionManager;
 import damose.model.Stop;
-import damose.model.VehicleType;
 import damose.service.FavoritesService;
 
 /**
  * Search overlay component for stops, lines, and favorites.
  */
 public class SearchOverlay extends JPanel {
+    private static final int PANEL_WIDTH = 520;
+    private static final int PANEL_HEIGHT = 420;
 
     private final JTextField searchField;
     private final DefaultListModel<Stop> listModel;
     private final JList<Stop> resultList;
     private final JPanel contentPanel;
-    private final JLabel stopsModeBtn;
-    private final JLabel linesModeBtn;
-    private final JLabel favoritesModeBtn;
+    private final SearchModeTabs modeTabs;
     private final JButton closeOverlayButton;
 
-    private enum SearchMode { STOPS, LINES, FAVORITES }
-    private SearchMode currentMode = SearchMode.STOPS;
-    private List<Stop> allStops = new ArrayList<>();
-    private List<Stop> allLines = new ArrayList<>();
-    private List<Stop> favoriteStops = new ArrayList<>();
+    private SearchOverlayMode currentMode = SearchOverlayMode.STOPS;
+    private List<Stop> allStops = List.of();
+    private List<Stop> allLines = List.of();
+    private List<Stop> favoriteStops = List.of();
     private Consumer<Stop> onSelect;
     private Runnable onFavoritesLoginRequired;
 
@@ -70,54 +60,18 @@ public class SearchOverlay extends JPanel {
         contentPanel = new JPanel(new BorderLayout());
         contentPanel.setBackground(AppConstants.BG_MEDIUM);
         contentPanel.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(AppConstants.BORDER_COLOR, 1),
-            new EmptyBorder(16, 16, 16, 16)
+                BorderFactory.createLineBorder(AppConstants.BORDER_COLOR, 1),
+                new EmptyBorder(16, 16, 16, 16)
         ));
 
-        JPanel modePanel = new JPanel();
-        modePanel.setOpaque(false);
-        modePanel.setBorder(new EmptyBorder(0, 0, 12, 0));
-
-        stopsModeBtn = createModeButton("Fermate", true);
-        linesModeBtn = createModeButton("Linee", false);
-        favoritesModeBtn = createModeButton("Preferiti", false);
-
-        stopsModeBtn.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) {
-                if (currentMode != SearchMode.STOPS) {
-                    currentMode = SearchMode.STOPS;
-                    updateModeButtons();
-                    filterResults();
-                }
-            }
+        modeTabs = new SearchModeTabs();
+        modeTabs.setOnModeChanged(mode -> {
+            currentMode = mode;
+            filterResults();
         });
-        linesModeBtn.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) {
-                if (currentMode != SearchMode.LINES) {
-                    currentMode = SearchMode.LINES;
-                    updateModeButtons();
-                    filterResults();
-                }
-            }
-        });
-        favoritesModeBtn.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) {
-                if (currentMode != SearchMode.FAVORITES) {
-                    currentMode = SearchMode.FAVORITES;
-                    updateModeButtons();
-                    filterResults();
-                }
-            }
-        });
-
-        modePanel.add(stopsModeBtn);
-        modePanel.add(Box.createHorizontalStrut(6));
-        modePanel.add(linesModeBtn);
-        modePanel.add(Box.createHorizontalStrut(6));
-        modePanel.add(favoritesModeBtn);
 
         closeOverlayButton = new JButton();
-        closeOverlayButton.setIcon(new CloseIcon(12, Color.WHITE));
+        closeOverlayButton.setIcon(new CloseGlyphIcon(12, Color.WHITE));
         closeOverlayButton.setFocusPainted(false);
         closeOverlayButton.setContentAreaFilled(false);
         closeOverlayButton.setOpaque(false);
@@ -132,12 +86,12 @@ public class SearchOverlay extends JPanel {
         closeOverlayButton.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent e) {
-                closeOverlayButton.setIcon(new CloseIcon(12, AppConstants.ACCENT_HOVER));
+                closeOverlayButton.setIcon(new CloseGlyphIcon(12, AppConstants.ACCENT_HOVER));
             }
 
             @Override
             public void mouseExited(MouseEvent e) {
-                closeOverlayButton.setIcon(new CloseIcon(12, Color.WHITE));
+                closeOverlayButton.setIcon(new CloseGlyphIcon(12, Color.WHITE));
             }
         });
 
@@ -147,15 +101,23 @@ public class SearchOverlay extends JPanel {
         searchField.setCaretColor(AppConstants.TEXT_PRIMARY);
         searchField.setFont(AppConstants.FONT_BODY);
         searchField.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(AppConstants.BORDER_COLOR),
-            new EmptyBorder(12, 14, 12, 14)
+                BorderFactory.createLineBorder(AppConstants.BORDER_COLOR),
+                new EmptyBorder(12, 14, 12, 14)
         ));
         searchField.setPreferredSize(new Dimension(468, 48));
 
         searchField.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent e) { filterResults(); }
-            public void removeUpdate(DocumentEvent e) { filterResults(); }
-            public void changedUpdate(DocumentEvent e) { filterResults(); }
+            public void insertUpdate(DocumentEvent e) {
+                filterResults();
+            }
+
+            public void removeUpdate(DocumentEvent e) {
+                filterResults();
+            }
+
+            public void changedUpdate(DocumentEvent e) {
+                filterResults();
+            }
         });
 
         searchField.addKeyListener(new KeyAdapter() {
@@ -164,7 +126,10 @@ public class SearchOverlay extends JPanel {
                 int code = e.getKeyCode();
                 if (shouldSuppressDeleteBeep(code)) {
                     e.consume();
-                } else if (code == KeyEvent.VK_ESCAPE) {
+                    return;
+                }
+
+                if (code == KeyEvent.VK_ESCAPE) {
                     closeOverlay();
                 } else if (code == KeyEvent.VK_ENTER) {
                     e.consume();
@@ -177,13 +142,7 @@ public class SearchOverlay extends JPanel {
                     moveSelection(-1);
                 } else if (code == KeyEvent.VK_TAB) {
                     e.consume();
-                    currentMode = switch (currentMode) {
-                        case STOPS -> SearchMode.LINES;
-                        case LINES -> SearchMode.FAVORITES;
-                        case FAVORITES -> SearchMode.STOPS;
-                    };
-                    updateModeButtons();
-                    filterResults();
+                    modeTabs.cycleMode();
                 }
             }
         });
@@ -193,7 +152,7 @@ public class SearchOverlay extends JPanel {
 
         JPanel modeHeader = new JPanel(new BorderLayout());
         modeHeader.setOpaque(false);
-        modeHeader.add(modePanel, BorderLayout.CENTER);
+        modeHeader.add(modeTabs.panel(), BorderLayout.CENTER);
         modeHeader.add(closeOverlayButton, BorderLayout.EAST);
 
         topPanel.add(modeHeader, BorderLayout.NORTH);
@@ -208,7 +167,7 @@ public class SearchOverlay extends JPanel {
         resultList.setSelectionForeground(Color.WHITE);
         resultList.setFont(AppConstants.FONT_BODY);
         resultList.setFixedCellHeight(58);
-        resultList.setCellRenderer(new StopCellRenderer());
+        resultList.setCellRenderer(new SearchStopCellRenderer());
 
         resultList.addKeyListener(new KeyAdapter() {
             @Override
@@ -221,13 +180,13 @@ public class SearchOverlay extends JPanel {
                     toggleSelectedFavorite();
                 } else if (e.getKeyCode() == KeyEvent.VK_DELETE
                         || e.getKeyCode() == KeyEvent.VK_BACK_SPACE) {
-
                     e.consume();
                 }
             }
         });
 
         resultList.addMouseListener(new MouseAdapter() {
+            @Override
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) {
                     selectCurrentAndClose();
@@ -264,42 +223,8 @@ public class SearchOverlay extends JPanel {
         });
     }
 
-    private JLabel createModeButton(String text, boolean selected) {
-        JLabel label = new JLabel(text);
-        label.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        label.setOpaque(true);
-        label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        label.setBorder(new EmptyBorder(8, 20, 8, 20));
-        if (selected) {
-            label.setBackground(AppConstants.ACCENT);
-            label.setForeground(Color.WHITE);
-        } else {
-            label.setBackground(AppConstants.BG_FIELD);
-            label.setForeground(AppConstants.TEXT_SECONDARY);
-        }
-        return label;
-    }
-
-    private void updateModeButtons() {
-        stopsModeBtn.setBackground(AppConstants.BG_FIELD);
-        stopsModeBtn.setForeground(AppConstants.TEXT_SECONDARY);
-        linesModeBtn.setBackground(AppConstants.BG_FIELD);
-        linesModeBtn.setForeground(AppConstants.TEXT_SECONDARY);
-        favoritesModeBtn.setBackground(AppConstants.BG_FIELD);
-        favoritesModeBtn.setForeground(AppConstants.TEXT_SECONDARY);
-
-        JLabel selected = switch (currentMode) {
-            case STOPS -> stopsModeBtn;
-            case LINES -> linesModeBtn;
-            case FAVORITES -> favoritesModeBtn;
-        };
-        selected.setBackground(AppConstants.ACCENT);
-        selected.setForeground(Color.WHITE);
-    }
-
     private void filterResults() {
         String query = searchField.getText().toLowerCase().trim();
-        listModel.clear();
 
         List<Stop> source = switch (currentMode) {
             case STOPS -> allStops;
@@ -307,64 +232,10 @@ public class SearchOverlay extends JPanel {
             case FAVORITES -> favoriteStops;
         };
 
-        int limit = (currentMode == SearchMode.FAVORITES) ? 100 : 50;
-        List<Stop> matches = new ArrayList<>();
-        for (Stop s : source) {
-            String name = s.getStopName().toLowerCase();
-            String id = s.getStopId().toLowerCase();
-            if (query.isEmpty() || name.contains(query) || id.contains(query)) {
-                matches.add(s);
-            }
-        }
-
-        if (currentMode == SearchMode.LINES && !query.isEmpty()) {
-            matches.sort((a, b) -> compareLineResults(a, b, query));
-        }
-
-        for (int i = 0; i < Math.min(limit, matches.size()); i++) {
-            listModel.addElement(matches.get(i));
-        }
-
+        SearchOverlayResultPopulator.populate(listModel, source, currentMode, query);
         if (!listModel.isEmpty()) {
             resultList.setSelectedIndex(0);
         }
-    }
-
-    private static int compareLineResults(Stop a, Stop b, String query) {
-        int scoreA = lineMatchScore(a, query);
-        int scoreB = lineMatchScore(b, query);
-        if (scoreA != scoreB) {
-            return Integer.compare(scoreA, scoreB);
-        }
-
-        String idA = a.getStopId() == null ? "" : a.getStopId().trim();
-        String idB = b.getStopId() == null ? "" : b.getStopId().trim();
-        if (idA.length() != idB.length()) {
-            return Integer.compare(idA.length(), idB.length());
-        }
-
-        int idCmp = String.CASE_INSENSITIVE_ORDER.compare(idA, idB);
-        if (idCmp != 0) {
-            return idCmp;
-        }
-
-        String nameA = a.getStopName() == null ? "" : a.getStopName().trim();
-        String nameB = b.getStopName() == null ? "" : b.getStopName().trim();
-        return String.CASE_INSENSITIVE_ORDER.compare(nameA, nameB);
-    }
-
-    private static int lineMatchScore(Stop line, String query) {
-        String q = query == null ? "" : query.trim().toLowerCase();
-        String id = line.getStopId() == null ? "" : line.getStopId().trim().toLowerCase();
-        String name = line.getStopName() == null ? "" : line.getStopName().trim().toLowerCase();
-        if (q.isEmpty()) return 99;
-
-        if (id.equals(q)) return 0;
-        if (id.startsWith(q)) return 1;
-        if (id.contains(q)) return 2;
-        if (name.startsWith(q)) return 3;
-        if (name.contains(q)) return 4;
-        return 5;
     }
 
     private void moveSelection(int delta) {
@@ -378,12 +249,14 @@ public class SearchOverlay extends JPanel {
 
     private void selectCurrentAndClose() {
         Stop selected = resultList.getSelectedValue();
-        if (selected != null) {
-            Consumer<Stop> callback = onSelect;
-            closeOverlay();
-            if (callback != null) {
-                SwingUtilities.invokeLater(() -> callback.accept(selected));
-            }
+        if (selected == null) {
+            return;
+        }
+
+        Consumer<Stop> callback = onSelect;
+        closeOverlay();
+        if (callback != null) {
+            SwingUtilities.invokeLater(() -> callback.accept(selected));
         }
     }
 
@@ -392,19 +265,22 @@ public class SearchOverlay extends JPanel {
             showFavoritesLoginRequiredPopup();
             return;
         }
-        Stop selected = resultList.getSelectedValue();
-        if (selected != null) {
-            if (selected.isFakeLine()) {
-                FavoritesService.toggleLineFavorite(selected.getStopId());
-            } else {
-                FavoritesService.toggleFavorite(selected.getStopId());
-            }
-            resultList.repaint();
 
-            if (currentMode == SearchMode.FAVORITES) {
-                favoriteStops = FavoritesService.getAllFavorites();
-                filterResults();
-            }
+        Stop selected = resultList.getSelectedValue();
+        if (selected == null) {
+            return;
+        }
+
+        if (selected.isFakeLine()) {
+            FavoritesService.toggleLineFavorite(selected.getStopId());
+        } else {
+            FavoritesService.toggleFavorite(selected.getStopId());
+        }
+        resultList.repaint();
+
+        if (currentMode == SearchOverlayMode.FAVORITES) {
+            favoriteStops = FavoritesService.getAllFavorites();
+            filterResults();
         }
     }
 
@@ -453,8 +329,8 @@ public class SearchOverlay extends JPanel {
      * Updates the data value.
      */
     public void setData(List<Stop> stops, List<Stop> lines) {
-        this.allStops = stops != null ? new ArrayList<>(stops) : new ArrayList<>();
-        this.allLines = lines != null ? new ArrayList<>(lines) : new ArrayList<>();
+        this.allStops = stops != null ? stops : List.of();
+        this.allLines = lines != null ? lines : List.of();
     }
 
     /**
@@ -472,48 +348,22 @@ public class SearchOverlay extends JPanel {
      * Handles showSearch.
      */
     public void showSearch() {
-        searchField.setText("");
-        currentMode = SearchMode.STOPS;
-        updateModeButtons();
-        filterResults();
-        setVisible(true);
-
-        int panelW = 520;
-        int panelH = 420;
-        int x = (getWidth() - panelW) / 2;
-        int y = (getHeight() - panelH) / 3;
-        contentPanel.setBounds(x, y, panelW, panelH);
-
-        SwingUtilities.invokeLater(() -> searchField.requestFocusInWindow());
+        openOverlay(SearchOverlayMode.STOPS, null);
     }
 
     /**
      * Handles showFavorites.
      */
     public void showFavorites(List<Stop> favorites) {
-        searchField.setText("");
-        this.favoriteStops = favorites != null ? new ArrayList<>(favorites) : new ArrayList<>();
-        currentMode = SearchMode.FAVORITES;
-        updateModeButtons();
-        filterResults();
-
-        setVisible(true);
-
-        int panelW = 520;
-        int panelH = 420;
-        int x = (getWidth() - panelW) / 2;
-        int y = (getHeight() - panelH) / 3;
-        contentPanel.setBounds(x, y, panelW, panelH);
-
-        SwingUtilities.invokeLater(() -> searchField.requestFocusInWindow());
+        openOverlay(SearchOverlayMode.FAVORITES, favorites);
     }
 
     /**
      * Handles updateFavorites.
      */
     public void updateFavorites(List<Stop> favorites) {
-        this.favoriteStops = new ArrayList<>(favorites);
-        if (currentMode == SearchMode.FAVORITES) {
+        this.favoriteStops = favorites != null ? favorites : List.of();
+        if (currentMode == SearchOverlayMode.FAVORITES) {
             filterResults();
         }
     }
@@ -525,12 +375,27 @@ public class SearchOverlay extends JPanel {
     public void setBounds(int x, int y, int width, int height) {
         super.setBounds(x, y, width, height);
         if (contentPanel != null && isVisible()) {
-            int panelW = 520;
-            int panelH = 420;
-            int px = (width - panelW) / 2;
-            int py = (height - panelH) / 3;
-            contentPanel.setBounds(px, py, panelW, panelH);
+            positionContentPanel(width, height);
         }
+    }
+
+    private void positionContentPanel(int width, int height) {
+        int px = (width - PANEL_WIDTH) / 2;
+        int py = (height - PANEL_HEIGHT) / 3;
+        contentPanel.setBounds(px, py, PANEL_WIDTH, PANEL_HEIGHT);
+    }
+
+    private void openOverlay(SearchOverlayMode mode, List<Stop> favorites) {
+        searchField.setText("");
+        if (favorites != null) {
+            this.favoriteStops = favorites;
+        }
+        currentMode = mode;
+        modeTabs.setCurrentMode(mode);
+        filterResults();
+        setVisible(true);
+        positionContentPanel(getWidth(), getHeight());
+        SwingUtilities.invokeLater(() -> searchField.requestFocusInWindow());
     }
 
     @Override
@@ -548,164 +413,4 @@ public class SearchOverlay extends JPanel {
     public boolean isOpaque() {
         return false;
     }
-
-    private static final class CloseIcon implements Icon {
-        private final int size;
-        private final Color color;
-
-        private CloseIcon(int size, Color color) {
-            this.size = Math.max(8, size);
-            this.color = color == null ? Color.WHITE : color;
-        }
-
-        @Override
-        public int getIconWidth() {
-            return size;
-        }
-
-        @Override
-        public int getIconHeight() {
-            return size;
-        }
-
-        @Override
-        public void paintIcon(java.awt.Component c, Graphics g, int x, int y) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
-                    java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(color);
-            g2.setStroke(new java.awt.BasicStroke(
-                    2f,
-                    java.awt.BasicStroke.CAP_ROUND,
-                    java.awt.BasicStroke.JOIN_ROUND
-            ));
-            int max = size - 2;
-            g2.drawLine(x + 1, y + 1, x + max, y + max);
-            g2.drawLine(x + max, y + 1, x + 1, y + max);
-            g2.dispose();
-        }
-    }
-
-    private class StopCellRenderer extends JPanel implements ListCellRenderer<Stop> {
-        private final JLabel nameLabel;
-        private final JLabel idLabel;
-        private final JLabel typeLabel;
-        private final JLabel starLabel;
-        private ImageIcon yellowStarIcon;
-        private final ImageIcon busTypeIcon;
-        private final ImageIcon tramTypeIcon;
-
-        public StopCellRenderer() {
-            setLayout(new BorderLayout());
-            setBorder(new EmptyBorder(10, 14, 10, 14));
-            setOpaque(true);
-
-            yellowStarIcon = new ImageIcon(createYellowStar(16));
-            busTypeIcon = loadTypeIcon("/sprites/bus.png");
-            tramTypeIcon = loadTypeIcon("/sprites/tram.png");
-
-            typeLabel = new JLabel();
-            typeLabel.setBorder(new EmptyBorder(0, 0, 0, 8));
-            typeLabel.setPreferredSize(new Dimension(22, 22));
-            add(typeLabel, BorderLayout.WEST);
-
-            JPanel textPanel = new JPanel();
-            textPanel.setOpaque(false);
-            textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
-
-            nameLabel = new JLabel();
-            nameLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
-
-            idLabel = new JLabel();
-            idLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-
-            textPanel.add(nameLabel);
-            textPanel.add(Box.createVerticalStrut(3));
-            textPanel.add(idLabel);
-
-            add(textPanel, BorderLayout.CENTER);
-
-            starLabel = new JLabel();
-            starLabel.setBorder(new EmptyBorder(0, 8, 0, 4));
-            starLabel.setPreferredSize(new Dimension(24, 24));
-            add(starLabel, BorderLayout.EAST);
-        }
-
-        private ImageIcon loadTypeIcon(String path) {
-            try {
-                ImageIcon raw = new ImageIcon(getClass().getResource(path));
-                Image scaled = raw.getImage().getScaledInstance(18, 18, Image.SCALE_SMOOTH);
-                return new ImageIcon(scaled);
-            } catch (Exception e) {
-                return null;
-            }
-        }
-
-        private Image createYellowStar(int size) {
-            java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
-                size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-            java.awt.Graphics2D g2 = img.createGraphics();
-            g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
-                               java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
-
-            int[] xPoints = new int[10];
-            int[] yPoints = new int[10];
-            double angleStep = Math.PI / 5;
-            int cx = size / 2;
-            int cy = size / 2;
-            int outerR = size / 2 - 1;
-            int innerR = size / 4;
-
-            for (int i = 0; i < 10; i++) {
-                double angle = -Math.PI / 2 + i * angleStep;
-                int r = (i % 2 == 0) ? outerR : innerR;
-                xPoints[i] = (int) (cx + r * Math.cos(angle));
-                yPoints[i] = (int) (cy + r * Math.sin(angle));
-            }
-
-            g2.setColor(new Color(255, 200, 50));
-            g2.fillPolygon(xPoints, yPoints, 10);
-            g2.setColor(new Color(200, 150, 0));
-            g2.drawPolygon(xPoints, yPoints, 10);
-            g2.dispose();
-            return img;
-        }
-
-        @Override
-        public java.awt.Component getListCellRendererComponent(JList<? extends Stop> list,
-                Stop value, int index, boolean isSelected, boolean cellHasFocus) {
-
-            String name = value.getStopName();
-            if (name.length() > 38) name = name.substring(0, 38) + "...";
-            nameLabel.setText(name);
-
-            boolean isFavorite;
-            if (value.isFakeLine()) {
-                VehicleType vehicleType = VehicleType.fromGtfsCode(value.getStopCode());
-                boolean isTram = vehicleType == VehicleType.TRAM;
-                idLabel.setText(isTram ? "Linea tram" : "Linea bus");
-                typeLabel.setIcon(isTram ? tramTypeIcon : busTypeIcon);
-                isFavorite = FavoritesService.isLineFavorite(value.getStopId());
-            } else {
-                idLabel.setText("Stop ID: " + value.getStopId());
-                typeLabel.setIcon(null);
-                isFavorite = FavoritesService.isFavorite(value.getStopId());
-            }
-
-            starLabel.setIcon(isFavorite ? yellowStarIcon : null);
-
-            if (isSelected) {
-                setBackground(AppConstants.ACCENT);
-                nameLabel.setForeground(Color.WHITE);
-                idLabel.setForeground(new Color(220, 220, 220));
-            } else {
-                setBackground(AppConstants.LIST_BG);
-                nameLabel.setForeground(AppConstants.TEXT_PRIMARY);
-                idLabel.setForeground(AppConstants.TEXT_SECONDARY);
-            }
-
-            return this;
-        }
-    }
 }
-

@@ -5,7 +5,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import damose.model.Trip;
 import damose.model.VehiclePosition;
@@ -15,27 +14,23 @@ import damose.model.VehiclePosition;
  */
 public class TripMatcher {
 
-    private final Map<String, Trip> tripsById;
-    private final Map<String, Trip> tripsByNormalizedId;
+    private final List<Trip> trips;
     private final Map<String, List<Trip>> tripsByExactIdCandidates;
     private final Map<String, List<Trip>> tripsByNormalizedIdCandidates;
 
     public TripMatcher(List<Trip> trips) {
-        this.tripsById = new HashMap<>();
-        this.tripsByNormalizedId = new HashMap<>();
+        this.trips = trips != null ? trips : List.of();
         this.tripsByExactIdCandidates = new HashMap<>();
         this.tripsByNormalizedIdCandidates = new HashMap<>();
 
-        for (Trip trip : trips) {
+        for (Trip trip : this.trips) {
             if (trip == null || trip.getTripId() == null) continue;
-            tripsById.putIfAbsent(trip.getTripId(), trip);
             tripsByExactIdCandidates
                     .computeIfAbsent(trip.getTripId(), k -> new java.util.ArrayList<>())
                     .add(trip);
 
             String normalized = TripIdUtils.normalizeSimple(trip.getTripId());
             if (normalized != null && !normalized.isBlank()) {
-                tripsByNormalizedId.putIfAbsent(normalized, trip);
                 tripsByNormalizedIdCandidates
                         .computeIfAbsent(normalized, k -> new java.util.ArrayList<>())
                         .add(trip);
@@ -49,9 +44,7 @@ public class TripMatcher {
     public Trip match(VehiclePosition vp) {
         if (vp == null) return null;
         Integer direction = vp.getDirectionId() >= 0 ? vp.getDirectionId() : null;
-        Trip match = matchByTripIdAndRoute(vp.getTripId(), vp.getRouteId(), direction);
-        if (match != null) return match;
-        return tripsById.get(vp.getTripId());
+        return matchByTripIdAndRoute(vp.getTripId(), vp.getRouteId(), direction);
     }
 
     /**
@@ -60,14 +53,14 @@ public class TripMatcher {
     public Trip matchByTripId(String tripId) {
         if (tripId == null || tripId.isBlank()) return null;
 
-        Trip exact = tripsById.get(tripId);
-        if (exact != null) return exact;
+        List<Trip> exact = tripsByExactIdCandidates.get(tripId);
+        if (exact != null && !exact.isEmpty()) return exact.get(0);
 
         Set<String> variants = TripIdUtils.generateVariants(tripId);
         for (String variant : variants) {
-            Trip byNormalized = tripsByNormalizedId.get(variant);
-            if (byNormalized != null) {
-                return byNormalized;
+            List<Trip> byNormalized = tripsByNormalizedIdCandidates.get(variant);
+            if (byNormalized != null && !byNormalized.isEmpty()) {
+                return byNormalized.get(0);
             }
         }
 
@@ -101,21 +94,40 @@ public class TripMatcher {
 
         String preferredRoute = trimToNull(routeId);
         if (preferredRoute != null) {
-            List<Trip> routeMatches = candidates.stream()
-                    .filter(t -> t != null
-                            && t.getRouteId() != null
-                            && preferredRoute.equalsIgnoreCase(t.getRouteId().trim()))
-                    .collect(Collectors.toList());
-            if (routeMatches.size() == 1) {
-                return routeMatches.get(0);
+            Trip onlyRouteMatch = null;
+            int routeMatches = 0;
+            for (Trip t : candidates) {
+                if (t == null || t.getRouteId() == null) continue;
+                if (!preferredRoute.equalsIgnoreCase(t.getRouteId().trim())) continue;
+                routeMatches++;
+                if (routeMatches == 1) {
+                    onlyRouteMatch = t;
+                } else {
+                    onlyRouteMatch = null;
+                    break;
+                }
             }
-            if (routeMatches.size() > 1) {
+            if (routeMatches == 1) {
+                return onlyRouteMatch;
+            }
+            if (routeMatches > 1) {
                 if (directionId != null && directionId >= 0) {
-                    List<Trip> directional = routeMatches.stream()
-                            .filter(t -> t.getDirectionId() == directionId)
-                            .collect(Collectors.toList());
-                    if (directional.size() == 1) {
-                        return directional.get(0);
+                    Trip onlyDirectionalMatch = null;
+                    int directionalMatches = 0;
+                    for (Trip t : candidates) {
+                        if (t == null || t.getRouteId() == null) continue;
+                        if (!preferredRoute.equalsIgnoreCase(t.getRouteId().trim())) continue;
+                        if (t.getDirectionId() != directionId) continue;
+                        directionalMatches++;
+                        if (directionalMatches == 1) {
+                            onlyDirectionalMatch = t;
+                        } else {
+                            onlyDirectionalMatch = null;
+                            break;
+                        }
+                    }
+                    if (directionalMatches == 1) {
+                        return onlyDirectionalMatch;
                     }
                 }
                 return null;
@@ -128,11 +140,20 @@ public class TripMatcher {
         }
 
         if (directionId != null && directionId >= 0) {
-            List<Trip> directional = candidates.stream()
-                    .filter(t -> t != null && t.getDirectionId() == directionId)
-                    .collect(Collectors.toList());
-            if (directional.size() == 1) {
-                return directional.get(0);
+            Trip onlyDirectionalMatch = null;
+            int directionalMatches = 0;
+            for (Trip t : candidates) {
+                if (t == null || t.getDirectionId() != directionId) continue;
+                directionalMatches++;
+                if (directionalMatches == 1) {
+                    onlyDirectionalMatch = t;
+                } else {
+                    onlyDirectionalMatch = null;
+                    break;
+                }
+            }
+            if (directionalMatches == 1) {
+                return onlyDirectionalMatch;
             }
         }
 
@@ -150,11 +171,14 @@ public class TripMatcher {
      */
     public List<Trip> searchByRouteOrHeadsign(String query) {
         String q = query.toLowerCase();
-        return tripsById.values().stream()
-                .filter(t -> t.getRouteId().toLowerCase().contains(q)
-                          || t.getTripHeadsign().toLowerCase().contains(q)
-                          || (t.getTripShortName() != null && t.getTripShortName().toLowerCase().contains(q)))
-                .collect(Collectors.toList());
+        return trips.stream()
+                .filter(t -> t != null
+                        && t.getRouteId() != null
+                        && t.getTripHeadsign() != null
+                        && (t.getRouteId().toLowerCase().contains(q)
+                        || t.getTripHeadsign().toLowerCase().contains(q)
+                        || (t.getTripShortName() != null && t.getTripShortName().toLowerCase().contains(q))))
+                .toList();
     }
 }
 

@@ -78,7 +78,7 @@ class VehicleTypeTest {
             assertEquals("Bus", bus.getDisplayName());
             assertEquals("bus.png", bus.getIconFileName());
             assertNotNull(bus.getColor());
-            assertEquals("ðŸšŒ", bus.getEmoji());
+            assertEquals("\uD83D\uDE8C", bus.getEmoji());
         }
 
         @Test
@@ -88,7 +88,7 @@ class VehicleTypeTest {
             assertEquals(0, tram.getGtfsCode());
             assertEquals("Tram", tram.getDisplayName());
             assertEquals("tram.png", tram.getIconFileName());
-            assertEquals("ðŸš‹", tram.getEmoji());
+            assertEquals("\uD83D\uDE8B", tram.getEmoji());
         }
 
         @Test
@@ -98,7 +98,7 @@ class VehicleTypeTest {
             assertEquals(1, metro.getGtfsCode());
             assertEquals("Metro", metro.getDisplayName());
             assertEquals("metro.png", metro.getIconFileName());
-            assertEquals("ðŸš‡", metro.getEmoji());
+            assertEquals("\uD83D\uDE87", metro.getEmoji());
         }
     }
 

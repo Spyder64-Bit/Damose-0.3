@@ -108,8 +108,6 @@ public class DamoseApp {
         RealtimeService.setOnDataReceived(() -> markRtReady(true));
         RealtimeService.setMode(ConnectionMode.ONLINE);
 
-        new Thread(RealtimeService::fetchRealtimeFeeds, "RealtimeInitialFetch").start();
-
         Timer timeoutCheck = new Timer(AppConstants.RT_TIMEOUT_SECONDS * 1000 + 500, e -> {
             ((Timer) e.getSource()).stop();
             if (!rtReady.get()) {

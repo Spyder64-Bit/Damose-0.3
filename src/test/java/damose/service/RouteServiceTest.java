@@ -54,7 +54,7 @@ class RouteServiceTest {
             new StopTime("T75_1", t2, t2, "S4", 2, "", 0, 0, 0, 1)
         );
 
-        routeService = new RouteService(trips, stopTimes, stops);
+        routeService = new RouteService(trips, stopTimes, stops, Collections.emptyMap());
     }
 
     @Nested
@@ -229,7 +229,8 @@ class RouteServiceTest {
             RouteService emptyService = new RouteService(
                 Collections.emptyList(), 
                 stopTimes, 
-                stops
+                stops,
+                Collections.emptyMap()
             );
             assertTrue(emptyService.findTripsByRouteId("64").isEmpty());
         }
@@ -240,7 +241,8 @@ class RouteServiceTest {
             RouteService emptyService = new RouteService(
                 trips, 
                 Collections.emptyList(), 
-                stops
+                stops,
+                Collections.emptyMap()
             );
             assertTrue(emptyService.getStopsForTrip("T64_1").isEmpty());
         }
@@ -251,7 +253,8 @@ class RouteServiceTest {
             RouteService emptyService = new RouteService(
                 trips, 
                 stopTimes, 
-                Collections.emptyList()
+                Collections.emptyList(),
+                Collections.emptyMap()
             );
             assertTrue(emptyService.getStopsForTrip("T64_1").isEmpty());
         }

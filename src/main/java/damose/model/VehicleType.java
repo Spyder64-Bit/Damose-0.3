@@ -88,15 +88,15 @@ public enum VehicleType {
      */
     public String getEmoji() {
         return switch (this) {
-            case TRAM -> "?????????";
-            case METRO -> "?????????";
-            case RAIL -> "?????????";
-            case BUS -> "????????";
-            case FERRY -> "?????????????";
-            case CABLE_CAR -> "????????";
-            case GONDOLA -> "????????";
-            case FUNICULAR -> "????????";
-            default -> "????????";
+            case TRAM -> "\uD83D\uDE8B";
+            case METRO -> "\uD83D\uDE87";
+            case RAIL -> "\uD83D\uDE86";
+            case BUS -> "\uD83D\uDE8C";
+            case FERRY -> "\u26F4";
+            case CABLE_CAR -> "\uD83D\uDEA0";
+            case GONDOLA -> "\uD83D\uDEA1";
+            case FUNICULAR -> "\uD83D\uDE9E";
+            default -> "\u2753";
         };
     }
 }

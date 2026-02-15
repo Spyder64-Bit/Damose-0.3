@@ -11,6 +11,7 @@ import javax.swing.SwingUtilities;
 
 import com.google.transit.realtime.GtfsRealtime;
 
+import damose.config.AppConstants;
 import damose.data.mapper.StopTripMapper;
 import damose.model.ConnectionMode;
 import damose.model.Trip;
@@ -29,6 +30,9 @@ import damose.view.map.MapOverlayManager;
 public final class RealtimeUpdateScheduler {
 
     private Timer timer;
+    private volatile long lastTripUpdatesFeedTs = Long.MIN_VALUE;
+    private volatile long lastVehiclePositionsFeedTs = Long.MIN_VALUE;
+    private volatile List<VehiclePosition> lastVehiclePositions = Collections.emptyList();
 
     public void start(MainView view,
                       List<Trip> trips,
@@ -36,7 +40,8 @@ public final class RealtimeUpdateScheduler {
                       ArrivalService arrivalService,
                       Supplier<ConnectionMode> modeSupplier,
                       Consumer<Long> feedTimestampConsumer,
-                      Consumer<List<VehiclePosition>> vehiclePositionsConsumer) {
+                      Consumer<List<VehiclePosition>> vehiclePositionsConsumer,
+                      Consumer<Boolean> realtimeHealthConsumer) {
         stop();
         timer = new Timer("realtime-updates", true);
         timer.scheduleAtFixedRate(new java.util.TimerTask() {
@@ -46,7 +51,7 @@ public final class RealtimeUpdateScheduler {
              */
             public void run() {
                 runCycle(view, trips, stopTripMapper, arrivalService, modeSupplier,
-                        feedTimestampConsumer, vehiclePositionsConsumer);
+                        feedTimestampConsumer, vehiclePositionsConsumer, realtimeHealthConsumer);
             }
         }, 0, 30_000);
     }
@@ -59,6 +64,9 @@ public final class RealtimeUpdateScheduler {
             timer.cancel();
             timer = null;
         }
+        lastTripUpdatesFeedTs = Long.MIN_VALUE;
+        lastVehiclePositionsFeedTs = Long.MIN_VALUE;
+        lastVehiclePositions = Collections.emptyList();
     }
 
     public void refreshMapOverlay(MainView view, List<Trip> trips, ConnectionMode mode,
@@ -69,7 +77,7 @@ public final class RealtimeUpdateScheduler {
             GtfsRealtime.FeedMessage vpFeed = RealtimeService.getLatestVehiclePositions();
             if (vpFeed != null) {
                 try {
-                    positions = GtfsParser.parseVehiclePositions(vpFeed);
+                    positions = getOrParseVehiclePositions(vpFeed);
                 } catch (Exception e) {
                     System.out.println("Error parsing vehicle positions: " + e.getMessage());
                 }
@@ -91,7 +99,8 @@ public final class RealtimeUpdateScheduler {
                           ArrivalService arrivalService,
                           Supplier<ConnectionMode> modeSupplier,
                           Consumer<Long> feedTimestampConsumer,
-                          Consumer<List<VehiclePosition>> vehiclePositionsConsumer) {
+                          Consumer<List<VehiclePosition>> vehiclePositionsConsumer,
+                          Consumer<Boolean> realtimeHealthConsumer) {
         GtfsRealtime.FeedMessage tuFeed = RealtimeService.getLatestTripUpdates();
         GtfsRealtime.FeedMessage vpFeed = RealtimeService.getLatestVehiclePositions();
 
@@ -106,10 +115,21 @@ public final class RealtimeUpdateScheduler {
         feedTimestampConsumer.accept(feedTs);
 
         ConnectionMode mode = modeSupplier.get();
+        if (realtimeHealthConsumer != null) {
+            long nowEpoch = Instant.now().getEpochSecond();
+            boolean healthy = mode == ConnectionMode.ONLINE
+                    && RealtimeService.isRealtimeHealthy(nowEpoch, AppConstants.RT_STALE_THRESHOLD_SECONDS);
+            realtimeHealthConsumer.accept(healthy);
+        }
+
         if (mode == ConnectionMode.ONLINE) {
             try {
-                List<TripUpdateRecord> updates = GtfsParser.parseTripUpdates(tuFeed, stopTripMapper, feedTs);
-                arrivalService.updateRealtimeArrivals(updates);
+                long tripFeedTs = extractFeedTimestamp(tuFeed, feedTs);
+                if (tripFeedTs != lastTripUpdatesFeedTs) {
+                    List<TripUpdateRecord> updates = GtfsParser.parseTripUpdates(tuFeed, stopTripMapper, feedTs);
+                    arrivalService.updateRealtimeArrivals(updates, feedTs);
+                    lastTripUpdatesFeedTs = tripFeedTs;
+                }
             } catch (Exception ex) {
                 System.out.println("Error parsing TripUpdates RT: " + ex.getMessage());
             }
@@ -118,7 +138,7 @@ public final class RealtimeUpdateScheduler {
         List<VehiclePosition> computedPositions;
         try {
             if (mode == ConnectionMode.ONLINE && vpFeed != null) {
-                computedPositions = GtfsParser.parseVehiclePositions(vpFeed);
+                computedPositions = getOrParseVehiclePositions(vpFeed);
                 System.out.println("Buses parsed: " + computedPositions.size());
                 ServiceQualityTracker.getInstance().updateVehicleCount(computedPositions.size());
             } else {
@@ -139,6 +159,25 @@ public final class RealtimeUpdateScheduler {
                 vehiclePositionsConsumer.accept(busPositions);
             }
         });
+    }
+
+    private List<VehiclePosition> getOrParseVehiclePositions(GtfsRealtime.FeedMessage vpFeed) {
+        long feedTs = extractFeedTimestamp(vpFeed, Long.MIN_VALUE);
+        if (feedTs == lastVehiclePositionsFeedTs) {
+            return lastVehiclePositions;
+        }
+
+        List<VehiclePosition> parsed = GtfsParser.parseVehiclePositions(vpFeed);
+        lastVehiclePositionsFeedTs = feedTs;
+        lastVehiclePositions = parsed != null ? parsed : Collections.emptyList();
+        return lastVehiclePositions;
+    }
+
+    private static long extractFeedTimestamp(GtfsRealtime.FeedMessage feed, long fallback) {
+        if (feed == null || !feed.hasHeader() || !feed.getHeader().hasTimestamp()) {
+            return fallback;
+        }
+        return feed.getHeader().getTimestamp();
     }
 }
 

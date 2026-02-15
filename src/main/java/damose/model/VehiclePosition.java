@@ -13,19 +13,31 @@ public class VehiclePosition {
     private final int stopSequence;
     private final String routeId;
     private final int directionId;
+    private final String occupancyInfo;
+    private final int occupancyPercentage;
+    private final String currentStopId;
 
     public VehiclePosition(String tripId, String vehicleId, GeoPosition position, int stopSequence) {
-        this(tripId, vehicleId, position, stopSequence, null, -1);
+        this(tripId, vehicleId, position, stopSequence, null, -1, null, -1, null);
     }
 
     public VehiclePosition(String tripId, String vehicleId, GeoPosition position, int stopSequence,
                            String routeId, int directionId) {
+        this(tripId, vehicleId, position, stopSequence, routeId, directionId, null, -1, null);
+    }
+
+    public VehiclePosition(String tripId, String vehicleId, GeoPosition position, int stopSequence,
+                           String routeId, int directionId,
+                           String occupancyInfo, int occupancyPercentage, String currentStopId) {
         this.tripId = tripId;
         this.vehicleId = vehicleId;
         this.position = position;
         this.stopSequence = stopSequence;
         this.routeId = routeId;
         this.directionId = directionId;
+        this.occupancyInfo = occupancyInfo;
+        this.occupancyPercentage = occupancyPercentage;
+        this.currentStopId = currentStopId;
     }
 
     /**
@@ -70,6 +82,27 @@ public class VehiclePosition {
         return directionId;
     }
 
+    /**
+     * Returns the occupancy info.
+     */
+    public String getOccupancyInfo() {
+        return occupancyInfo;
+    }
+
+    /**
+     * Returns the occupancy percentage.
+     */
+    public int getOccupancyPercentage() {
+        return occupancyPercentage;
+    }
+
+    /**
+     * Returns the current stop id.
+     */
+    public String getCurrentStopId() {
+        return currentStopId;
+    }
+
     @Override
     /**
      * Returns the result of toString.
@@ -79,7 +112,9 @@ public class VehiclePosition {
                " route=" + routeId +
                " dir=" + directionId +
                " pos=" + position.getLatitude() + "," + position.getLongitude() +
-               " stopSeq=" + stopSequence;
+               " stopSeq=" + stopSequence +
+               " occ=" + occupancyInfo +
+               " occPct=" + occupancyPercentage;
     }
 }
 

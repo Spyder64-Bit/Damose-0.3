@@ -2,6 +2,7 @@ package damose.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.lang.reflect.Method;
 
 import org.jxmapviewer.viewer.GeoPosition;
 
@@ -23,8 +24,9 @@ public final class GtfsParser {
     public static List<TripUpdateRecord> parseTripUpdates(GtfsRealtime.FeedMessage feed,
                                                           StopTripMapper stopTripMapper,
                                                           Long feedHeaderTs) {
-        List<TripUpdateRecord> updates = new ArrayList<>();
-        if (feed == null) return updates;
+        if (feed == null) return new ArrayList<>();
+        int entityCount = Math.max(16, feed.getEntityCount() * 2);
+        List<TripUpdateRecord> updates = new ArrayList<>(entityCount);
 
         for (GtfsRealtime.FeedEntity entity : feed.getEntityList()) {
             if (!entity.hasTripUpdate()) continue;
@@ -87,8 +89,9 @@ public final class GtfsParser {
      * Returns the result of parseVehiclePositions.
      */
     public static List<VehiclePosition> parseVehiclePositions(GtfsRealtime.FeedMessage feed) {
-        List<VehiclePosition> positions = new ArrayList<>();
-        if (feed == null) return positions;
+        if (feed == null) return new ArrayList<>();
+        int entityCount = Math.max(16, feed.getEntityCount());
+        List<VehiclePosition> positions = new ArrayList<>(entityCount);
 
         for (GtfsRealtime.FeedEntity entity : feed.getEntityList()) {
             if (!entity.hasVehicle()) continue;
@@ -103,6 +106,9 @@ public final class GtfsParser {
                     ? vehicle.getTrip().getDirectionId() : -1;
             String vehicleId = (vehicle.hasVehicle() && vehicle.getVehicle().hasId())
                     ? vehicle.getVehicle().getId() : null;
+            String currentStopId = vehicle.hasStopId() ? normalizeStopId(vehicle.getStopId()) : null;
+            String occupancyInfo = parseOccupancyInfo(vehicle);
+            int occupancyPercentage = parseOccupancyPercentage(vehicle);
 
             if (!vehicle.hasPosition()) {
                 continue;
@@ -139,7 +145,10 @@ public final class GtfsParser {
                 new GeoPosition(lat, lon),
                 stopSeq,
                 routeId,
-                directionId
+                directionId,
+                occupancyInfo,
+                occupancyPercentage,
+                currentStopId
             ));
         }
 
@@ -179,6 +188,47 @@ public final class GtfsParser {
 
         if (raw >= 1_000_000_000L) {
             return raw;
+        }
+
+        return -1;
+    }
+
+    private static String parseOccupancyInfo(GtfsRealtime.VehiclePosition vehicle) {
+        if (vehicle == null || !vehicle.hasOccupancyStatus()) {
+            return null;
+        }
+
+        String status = vehicle.getOccupancyStatus().name();
+        return switch (status) {
+            case "EMPTY" -> "vuoto";
+            case "MANY_SEATS_AVAILABLE" -> "molti posti disponibili";
+            case "FEW_SEATS_AVAILABLE" -> "pochi posti disponibili";
+            case "STANDING_ROOM_ONLY" -> "solo posti in piedi";
+            case "CRUSHED_STANDING_ROOM_ONLY" -> "molto affollato";
+            case "FULL" -> "completo";
+            case "NOT_ACCEPTING_PASSENGERS" -> "non accetta passeggeri";
+            case "NO_DATA_AVAILABLE" -> "dato non disponibile";
+            case "NOT_BOARDABLE" -> "non accessibile";
+            default -> status.toLowerCase().replace('_', ' ');
+        };
+    }
+
+    private static int parseOccupancyPercentage(GtfsRealtime.VehiclePosition vehicle) {
+        if (vehicle == null) return -1;
+
+        try {
+            Method hasMethod = vehicle.getClass().getMethod("hasOccupancyPercentage");
+            Object has = hasMethod.invoke(vehicle);
+            if (!(has instanceof Boolean) || !((Boolean) has)) {
+                return -1;
+            }
+
+            Method getMethod = vehicle.getClass().getMethod("getOccupancyPercentage");
+            Object value = getMethod.invoke(vehicle);
+            if (value instanceof Integer i && i >= 0) {
+                return i;
+            }
+        } catch (Exception ignored) {
         }
 
         return -1;

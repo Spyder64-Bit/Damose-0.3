@@ -5,10 +5,10 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import damose.model.StopTime;
 import damose.model.Trip;
@@ -20,6 +20,7 @@ public class StopTripMapper {
 
     private final Map<String, List<StopTime>> stopToTrips = new HashMap<>();
     private final Map<String, Map<Integer, String>> tripSeqToStop = new HashMap<>();
+    private final Map<String, List<StopTime>> tripToStopTimes = new HashMap<>();
     private final Set<String> knownStopIds = new HashSet<>();
     private final TripMatcher matcher;
 
@@ -39,10 +40,15 @@ public class StopTripMapper {
             tripSeqToStop
                     .computeIfAbsent(normTripId, k -> new HashMap<>())
                     .put(seq, stopId);
+
+            tripToStopTimes.computeIfAbsent(normTripId, k -> new ArrayList<>()).add(st);
         }
 
         for (List<StopTime> list : stopToTrips.values()) {
             list.sort(Comparator.comparing(StopTime::getArrivalTime, Comparator.nullsLast(Comparator.naturalOrder())));
+        }
+        for (List<StopTime> list : tripToStopTimes.values()) {
+            list.sort(Comparator.comparingInt(StopTime::getStopSequence));
         }
 
         System.out.println("StopTripMapper initialized: stopToTrips=" + stopToTrips.size() +
@@ -56,12 +62,15 @@ public class StopTripMapper {
         List<StopTime> times = stopToTrips.getOrDefault(stopId, Collections.emptyList());
         if (times.isEmpty() || matcher == null) return Collections.emptyList();
 
-        List<Trip> result = new ArrayList<>(times.size());
+        Set<Trip> distinctTrips = new LinkedHashSet<>();
         for (StopTime st : times) {
             Trip trip = matcher.matchByTripId(st.getTripId());
-            if (trip != null) result.add(trip);
+            if (trip != null) distinctTrips.add(trip);
         }
-        return result.stream().distinct().collect(Collectors.toList());
+        if (distinctTrips.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return new ArrayList<>(distinctTrips);
     }
 
     /**
@@ -105,6 +114,29 @@ public class StopTripMapper {
      */
     public List<StopTime> getStopTimesForStop(String stopId) {
         return stopToTrips.getOrDefault(stopId, Collections.emptyList());
+    }
+
+    /**
+     * Returns the stop times for trip.
+     */
+    public List<StopTime> getStopTimesForTrip(String tripId) {
+        if (tripId == null) return Collections.emptyList();
+
+        String norm = normalizeTripId(tripId);
+        List<StopTime> direct = tripToStopTimes.get(norm);
+        if (direct != null) {
+            return direct;
+        }
+
+        String simple = TripIdUtils.normalizeSimple(tripId);
+        if (simple != null && !simple.equals(norm)) {
+            List<StopTime> fallback = tripToStopTimes.get(simple);
+            if (fallback != null) {
+                return fallback;
+            }
+        }
+
+        return Collections.emptyList();
     }
 
     private String normalizeTripId(String id) {

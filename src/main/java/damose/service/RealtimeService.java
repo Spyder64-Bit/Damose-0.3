@@ -3,6 +3,7 @@ package damose.service;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.time.Instant;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -23,6 +24,8 @@ public class RealtimeService {
     private static ConnectionMode mode = ConnectionMode.ONLINE;
     private static Runnable onDataReceived;
     private static boolean dataReceivedOnce = false;
+    private static volatile long lastSuccessfulFetchEpochSeconds = Long.MIN_VALUE;
+    private static volatile int consecutiveFailures = 0;
 
     private RealtimeService() {
     }
@@ -30,8 +33,16 @@ public class RealtimeService {
     /**
      * Updates the mode value.
      */
-    public static void setMode(ConnectionMode newMode) {
+    public static synchronized void setMode(ConnectionMode newMode) {
         mode = newMode;
+        if (newMode == ConnectionMode.OFFLINE) {
+            clearRealtimeCache();
+            resetHealthState();
+            dataReceivedOnce = false;
+        } else {
+            dataReceivedOnce = false;
+            consecutiveFailures = 0;
+        }
     }
 
     /**
@@ -68,19 +79,24 @@ public class RealtimeService {
             timer.cancel();
             timer = null;
         }
+        if (mode == ConnectionMode.OFFLINE) {
+            clearRealtimeCache();
+        }
     }
 
     /**
      * Returns the result of fetchRealtimeFeeds.
      */
     public static void fetchRealtimeFeeds() {
+        boolean hadSuccessfulFetch = false;
         try {
             GtfsRealtime.FeedMessage parsed = fetchFeedFromUrl(AppConstants.VEHICLE_POSITIONS_URL);
             if (parsed != null) {
                 latestVehiclePositions = parsed;
-                System.out.println("VehiclePositions updated: header.ts=" +
-                        (parsed.hasHeader() && parsed.getHeader().hasTimestamp()
-                            ? parsed.getHeader().getTimestamp() : "n/a"));
+                hadSuccessfulFetch = true;
+                System.out.println("VehiclePositions updated: header.ts="
+                        + (parsed.hasHeader() && parsed.getHeader().hasTimestamp()
+                        ? parsed.getHeader().getTimestamp() : "n/a"));
             }
         } catch (Exception e) {
             System.out.println("Error fetching VehiclePositions: " + e.getMessage());
@@ -90,13 +106,21 @@ public class RealtimeService {
             GtfsRealtime.FeedMessage parsed = fetchFeedFromUrl(AppConstants.TRIP_UPDATES_URL);
             if (parsed != null) {
                 latestTripUpdates = parsed;
-                System.out.println("TripUpdates updated: header.ts=" +
-                        (parsed.hasHeader() && parsed.getHeader().hasTimestamp()
-                            ? parsed.getHeader().getTimestamp() : "n/a"));
-                notifyDataReceived();
+                hadSuccessfulFetch = true;
+                System.out.println("TripUpdates updated: header.ts="
+                        + (parsed.hasHeader() && parsed.getHeader().hasTimestamp()
+                        ? parsed.getHeader().getTimestamp() : "n/a"));
             }
         } catch (Exception e) {
             System.out.println("Error fetching TripUpdates: " + e.getMessage());
+        }
+
+        if (hadSuccessfulFetch) {
+            lastSuccessfulFetchEpochSeconds = Instant.now().getEpochSecond();
+            consecutiveFailures = 0;
+            notifyDataReceived();
+        } else {
+            consecutiveFailures++;
         }
     }
 
@@ -119,12 +143,12 @@ public class RealtimeService {
                 return null;
             }
 
+            if (conn.getContentLengthLong() == 0) {
+                return null;
+            }
+
             try (InputStream in = conn.getInputStream()) {
-                byte[] data = in.readAllBytes();
-                if (data == null || data.length == 0) {
-                    return null;
-                }
-                return GtfsRealtime.FeedMessage.parseFrom(data);
+                return GtfsRealtime.FeedMessage.parseFrom(in);
             }
         } catch (java.io.IOException ex) {
             System.out.println("Error fetching/parsing from " + urlStr + ": " + ex.getMessage());
@@ -156,6 +180,38 @@ public class RealtimeService {
     }
 
     /**
+     * Returns last successful realtime fetch epoch-second.
+     */
+    public static long getLastSuccessfulFetchEpochSeconds() {
+        return lastSuccessfulFetchEpochSeconds;
+    }
+
+    /**
+     * Returns consecutive realtime fetch failures.
+     */
+    public static int getConsecutiveFailures() {
+        return consecutiveFailures;
+    }
+
+    /**
+     * Returns whether realtime feed is considered healthy.
+     */
+    public static boolean isRealtimeHealthy(long nowEpochSeconds, long staleAfterSeconds) {
+        if (mode != ConnectionMode.ONLINE) {
+            return false;
+        }
+        long last = lastSuccessfulFetchEpochSeconds;
+        if (last == Long.MIN_VALUE) {
+            return false;
+        }
+        if (staleAfterSeconds <= 0) {
+            return true;
+        }
+        long ageSeconds = nowEpochSeconds - last;
+        return ageSeconds >= 0 && ageSeconds <= staleAfterSeconds;
+    }
+
+    /**
      * Registers callback for data received.
      */
     public static void setOnDataReceived(Runnable callback) {
@@ -169,6 +225,16 @@ public class RealtimeService {
                 onDataReceived.run();
             }
         }
+    }
+
+    private static void clearRealtimeCache() {
+        latestVehiclePositions = null;
+        latestTripUpdates = null;
+    }
+
+    private static void resetHealthState() {
+        lastSuccessfulFetchEpochSeconds = Long.MIN_VALUE;
+        consecutiveFailures = 0;
     }
 }
 

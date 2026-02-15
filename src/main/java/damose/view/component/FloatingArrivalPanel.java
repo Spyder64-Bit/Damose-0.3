@@ -1,7 +1,6 @@
 package damose.view.component;
 
 import java.awt.AlphaComposite;
-import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -10,7 +9,6 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Image;
 import java.awt.Polygon;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
@@ -57,6 +55,9 @@ public class FloatingArrivalPanel extends JPanel {
     private boolean viewAllMode = false;
     private List<String> normalArrivals = new ArrayList<>();
     private List<String> allTripsData = new ArrayList<>();
+    private boolean favoriteEnabled = true;
+    private boolean viewAllEnabled = true;
+    private boolean compactRowsMode = false;
 
     private float alpha = 1.0f;
     private Timer fadeTimer;
@@ -243,38 +244,22 @@ public class FloatingArrivalPanel extends JPanel {
      * Handles showAllTripsView.
      */
     public void showAllTripsView(List<String> allTrips) {
+        if (!viewAllEnabled) {
+            return;
+        }
         this.allTripsData = new ArrayList<>(allTrips);
         this.viewAllMode = true;
 
         title.setText("Passaggi del giorno (" + allTrips.size() + ")");
-        viewAllButton.setVisible(false);
-        backButton.setVisible(true);
+        applyActionVisibility();
 
         arrivalsList.removeAll();
 
         if (allTrips.isEmpty()) {
-            JLabel noData = new JLabel("Nessun passaggio programmato");
-            noData.setForeground(AppConstants.TEXT_SECONDARY);
-            noData.setFont(ARRIVAL_FONT);
-            noData.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
-            arrivalsList.add(noData);
+            arrivalsList.add(FloatingArrivalRowFactory.createNoTripsLabel(ARRIVAL_FONT));
         } else {
             for (String trip : allTrips) {
-                String html = "<html><body style='width:" + (AppConstants.FLOATING_PANEL_WIDTH - 60) + "px'>" + trip + "</body></html>";
-                JLabel label = new JLabel(html);
-                label.setForeground(Color.WHITE);
-                label.setFont(SMALL_FONT);
-                label.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
-                label.setMaximumSize(new Dimension(AppConstants.FLOATING_PANEL_WIDTH - 40, 70));
-                label.setVerticalTextPosition(JLabel.TOP);
-
-                if (trip.contains("[+") || trip.contains("ritardo")) {
-                    label.setForeground(AppConstants.ERROR_COLOR);
-                } else if (trip.contains("[-") || trip.contains("[OK]")) {
-                    label.setForeground(AppConstants.SUCCESS_COLOR);
-                }
-
-                arrivalsList.add(label);
+                arrivalsList.add(FloatingArrivalRowFactory.createTripRowLabel(trip, SMALL_FONT));
             }
         }
 
@@ -293,8 +278,7 @@ public class FloatingArrivalPanel extends JPanel {
         String displayName = safeName.length() > 25 ? safeName.substring(0, 25) + "..." : safeName;
         title.setText("Arrivi a " + displayName);
 
-        viewAllButton.setVisible(true);
-        backButton.setVisible(false);
+        applyActionVisibility();
 
         arrivalsList.removeAll();
         displayArrivals(normalArrivals);
@@ -305,73 +289,56 @@ public class FloatingArrivalPanel extends JPanel {
 
     private void displayArrivals(List<String> arrivals) {
         for (String a : arrivals) {
-            Color dotColor = Color.WHITE;
-            String lower = a.toLowerCase();
-            if (lower.contains("ritardo")) {
-                dotColor = AppConstants.ERROR_COLOR;
-            } else if (lower.contains("anticipo") || lower.contains("in orario")) {
-                dotColor = AppConstants.SUCCESS_COLOR;
-            } else if (lower.contains("statico")) {
-                dotColor = AppConstants.TEXT_SECONDARY;
-            }
-
-            String html = "<html><body style='width:" + (AppConstants.FLOATING_PANEL_WIDTH - 60) + "px'>" + a + "</body></html>";
-            JLabel label = new JLabel(html);
-            label.setForeground(Color.WHITE);
-            label.setFont(ARRIVAL_FONT);
-            label.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 4));
-            label.setIcon(new DotIcon(10, dotColor));
-            label.setIconTextGap(12);
-            label.setMaximumSize(new Dimension(AppConstants.FLOATING_PANEL_WIDTH - 40, 80));
-            label.setVerticalTextPosition(JLabel.TOP);
-            arrivalsList.add(label);
+            int wrapWidth = resolveArrivalTextWrapWidth();
+            arrivalsList.add(FloatingArrivalRowFactory.createArrivalRowLabel(
+                    a,
+                    compactRowsMode,
+                    wrapWidth,
+                    ARRIVAL_FONT
+            ));
         }
     }
 
+    private int resolveArrivalTextWrapWidth() {
+        int viewportWidth = scrollPane != null && scrollPane.getViewport() != null
+                ? scrollPane.getViewport().getWidth()
+                : 0;
+        int baseWidth = viewportWidth > 0 ? viewportWidth : AppConstants.FLOATING_PANEL_WIDTH - 56;
+        int iconAndPadding = 10 + (compactRowsMode ? 8 : 12) + 18;
+        int scrollbarReserve = 18;
+        return Math.max(120, baseWidth - iconAndPadding - scrollbarReserve);
+    }
+
     private void updatePanelSize(int rows) {
-        int rowHeight = 44;
-        int headerHeight = 50;
-        int footerHeight = 40;
-        int padding = 10;
-
-        int scrollHeight = Math.max(rows * rowHeight, rowHeight);
-        int contentHeight = headerHeight + scrollHeight + footerHeight + padding;
-
-        applyPanelSize(contentHeight, scrollHeight);
+        FloatingPanelLayoutPolicy.SizeTarget target =
+                FloatingPanelLayoutPolicy.forArrivals(rows, compactRowsMode);
+        applyPanelSize(target.contentHeight, target.scrollHeight);
     }
 
     private void updatePanelSizeForTrips(int rows) {
-        int rowHeight = 30;
-        int headerHeight = 50;
-        int footerHeight = 40;
-        int padding = 10;
-
-        int scrollHeight = Math.max(rows * rowHeight, rowHeight);
-        int contentHeight = headerHeight + scrollHeight + footerHeight + padding;
-
-        scrollHeight = Math.min(Math.max(scrollHeight, 80), 150);
-        contentHeight = headerHeight + scrollHeight + footerHeight + padding;
-
-        applyPanelSize(contentHeight, scrollHeight);
+        FloatingPanelLayoutPolicy.SizeTarget target = FloatingPanelLayoutPolicy.forTrips(rows);
+        applyPanelSize(target.contentHeight, target.scrollHeight);
     }
 
     private void applyPanelSize(int contentHeight, int scrollHeight) {
-        int fixedSectionHeight = Math.max(0, contentHeight - scrollHeight);
         int maxHeight = resolvePanelMaxHeight();
-        int maxScrollHeight = Math.max(MIN_SCROLL_HEIGHT, maxHeight - fixedSectionHeight);
-        int clampedScrollHeight = Math.min(Math.max(scrollHeight, MIN_SCROLL_HEIGHT), maxScrollHeight);
-        int clampedContentHeight = fixedSectionHeight + clampedScrollHeight;
+        FloatingPanelSizeCalculator.SizeResult clamped = FloatingPanelSizeCalculator.clamp(
+                contentHeight,
+                scrollHeight,
+                MIN_SCROLL_HEIGHT,
+                maxHeight
+        );
 
-        content.setBounds(0, 0, AppConstants.FLOATING_PANEL_WIDTH, clampedContentHeight);
+        content.setBounds(0, 0, AppConstants.FLOATING_PANEL_WIDTH, clamped.contentHeight);
         scrollPane.setPreferredSize(new Dimension(
                 AppConstants.FLOATING_PANEL_WIDTH - 28,
-                clampedScrollHeight));
+                clamped.scrollHeight));
         scrollPane.setMaximumSize(new Dimension(
                 AppConstants.FLOATING_PANEL_WIDTH - 28,
-                clampedScrollHeight));
+                clamped.scrollHeight));
 
-        setPreferredSize(new Dimension(AppConstants.FLOATING_PANEL_WIDTH, clampedContentHeight));
-        setSize(AppConstants.FLOATING_PANEL_WIDTH, clampedContentHeight);
+        setPreferredSize(new Dimension(AppConstants.FLOATING_PANEL_WIDTH, clamped.contentHeight));
+        setSize(AppConstants.FLOATING_PANEL_WIDTH, clamped.contentHeight);
 
         content.revalidate();
         content.repaint();
@@ -388,134 +355,19 @@ public class FloatingArrivalPanel extends JPanel {
         if (getParent() == null) {
             return MAX_PANEL_HEIGHT;
         }
-        int parentHeightCap = Math.max(220, getParent().getHeight() - 20);
-        return Math.min(MAX_PANEL_HEIGHT, parentHeightCap);
+        return FloatingPanelSizeCalculator.resolvePanelMaxHeight(getParent().getHeight(), MAX_PANEL_HEIGHT);
     }
 
     private void loadStarIcons() {
-        try {
-            ImageIcon starIcon = new ImageIcon(getClass().getResource("/sprites/star.png"));
-            Image scaled = starIcon.getImage().getScaledInstance(22, 22, Image.SCALE_SMOOTH);
-
-            starFilledIcon = new ImageIcon(scaled);
-
-            starEmptyIcon = new ImageIcon(createOutlineImage(starIcon.getImage(), 22));
-
-        } catch (Exception e) {
-            System.out.println("Could not load star icons: " + e.getMessage());
+        StarIconFactory.StarIcons icons = StarIconFactory.load(getClass(), 22);
+        if (icons.filled == null || icons.outline == null) {
+            System.out.println("Could not load star icons");
             starFilledIcon = null;
             starEmptyIcon = null;
+            return;
         }
-    }
-
-    private Image createOutlineImage(Image ignoredSrc, int size) {
-        java.awt.image.BufferedImage outline = new java.awt.image.BufferedImage(
-            size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2 = outline.createGraphics();
-        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        int[] xPoints = new int[10];
-        int[] yPoints = new int[10];
-        double angleStep = Math.PI / 5;
-        int cx = size / 2;
-        int cy = size / 2;
-        int outerR = size / 2 - 1;
-        int innerR = size / 4;
-
-        for (int i = 0; i < 10; i++) {
-            double angle = -Math.PI / 2 + i * angleStep;
-            int r = (i % 2 == 0) ? outerR : innerR;
-            xPoints[i] = (int) (cx + r * Math.cos(angle));
-            yPoints[i] = (int) (cy + r * Math.sin(angle));
-        }
-
-        g2.setColor(new Color(255, 200, 50));
-        g2.fillPolygon(xPoints, yPoints, 10);
-        g2.setColor(new Color(200, 150, 0));
-        g2.setStroke(new BasicStroke(1f));
-        g2.drawPolygon(xPoints, yPoints, 10);
-        g2.dispose();
-        return outline;
-    }
-
-    private static class DotIcon implements Icon {
-        private final int size;
-        private final Color color;
-
-        DotIcon(int size, Color color) {
-            this.size = size;
-            this.color = color;
-        }
-
-        @Override
-        /**
-         * Handles paintIcon.
-         */
-        public void paintIcon(Component c, Graphics g, int x, int y) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(color);
-            g2.fillOval(x, y + 2, size, size);
-            g2.dispose();
-        }
-
-        @Override
-        /**
-         * Returns the icon width.
-         */
-        public int getIconWidth() {
-            return size;
-        }
-
-        @Override
-        /**
-         * Returns the icon height.
-         */
-        public int getIconHeight() {
-            return size;
-        }
-    }
-
-    private static class XIcon implements Icon {
-        private final int size;
-        private final Color color;
-
-        XIcon(int size, Color color) {
-            this.size = size;
-            this.color = color;
-        }
-
-        @Override
-        /**
-         * Handles paintIcon.
-         */
-        public void paintIcon(Component c, Graphics g, int x, int y) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setStroke(new BasicStroke(2.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g2.setColor(color);
-            int pad = 2;
-            g2.drawLine(x + pad, y + pad, x + size - pad, y + size - pad);
-            g2.drawLine(x + pad, y + size - pad, x + size - pad, y + pad);
-            g2.dispose();
-        }
-
-        @Override
-        /**
-         * Returns the icon width.
-         */
-        public int getIconWidth() {
-            return size;
-        }
-
-        @Override
-        /**
-         * Returns the icon height.
-         */
-        public int getIconHeight() {
-            return size;
-        }
+        starFilledIcon = icons.filled;
+        starEmptyIcon = icons.outline;
     }
 
     /**
@@ -526,6 +378,8 @@ public class FloatingArrivalPanel extends JPanel {
         this.currentStopName = stopName;
         this.normalArrivals = new ArrayList<>(arrivi);
         this.viewAllMode = false;
+        this.compactRowsMode = false;
+        setActionButtonsVisible(true, true);
         setFavoriteStatus(isFavorite);
 
         String safeName = stopName == null ? "" : stopName;
@@ -541,6 +395,44 @@ public class FloatingArrivalPanel extends JPanel {
         arrivalsList.revalidate();
         int rows = Math.min(Math.max(arrivi.size(), 1), maxRows);
         updatePanelSize(rows);
+    }
+
+    /**
+     * Updates panel with generic info rows.
+     */
+    public void updateInfo(String panelTitle, List<String> rows) {
+        this.currentStopId = null;
+        this.currentStopName = panelTitle;
+        this.normalArrivals = new ArrayList<>(rows);
+        this.viewAllMode = false;
+        this.compactRowsMode = true;
+        setActionButtonsVisible(false, false);
+
+        String safeTitle = panelTitle == null ? "" : panelTitle;
+        title.setText(safeTitle);
+
+        arrivalsList.removeAll();
+        displayArrivals(rows);
+
+        arrivalsList.revalidate();
+        int visibleRows = Math.min(Math.max(rows.size(), 1), maxRows);
+        updatePanelSize(visibleRows);
+    }
+
+    /**
+     * Updates the action buttons visibility value.
+     */
+    public void setActionButtonsVisible(boolean favoriteVisible, boolean viewAllVisible) {
+        this.favoriteEnabled = favoriteVisible;
+        this.viewAllEnabled = viewAllVisible;
+        applyActionVisibility();
+    }
+
+    private void applyActionVisibility() {
+        favoriteButton.setVisible(favoriteEnabled);
+        footerPanel.setVisible(viewAllEnabled);
+        viewAllButton.setVisible(viewAllEnabled && !viewAllMode);
+        backButton.setVisible(viewAllEnabled && viewAllMode);
     }
 
     /**

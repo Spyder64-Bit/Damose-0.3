@@ -1,4 +1,7 @@
 # Damose
+<p align="center">
+  <img src="src/main/resources/sprites/icon.png" alt="Damose icon" width="120" />
+</p>
 
 ## Come Installare?
 
@@ -59,22 +62,34 @@ Il progetto segue una struttura a livelli:
 - `model`: entita dominio.
 - `database`: persistenza utente/sessione/preferiti.
 
-### UML Class Diagram
+### UML Class Diagram (Detailed, post-refactor)
 ```mermaid
 classDiagram
+    direction LR
+
     class DamoseApp {
       +main(String[] args)
     }
 
     class MainController {
       -ControllerDataLoader dataLoader
-      -ControllerDataContext dataContext
       -RealtimeUpdateScheduler realtimeScheduler
       -RouteViewportNavigator routeViewport
       -RouteVehicleMarkerBuilder routeVehicleMarkerBuilder
+      -VehiclePanelInfoBuilder vehiclePanelInfoBuilder
+      -RoutePanelFlow routePanelFlow
+      -StopPanelFlow stopPanelFlow
+      -VehicleFollowFlow vehicleFollowFlow
       -MainView view
-      -ConnectionMode mode
       +start()
+      -setupViewCallbacks()
+      -setupSearchPanel()
+      -handleStopSelection(stop, fromSearch)
+      -handleLineSelection(fakeLine)
+      -onRouteDirectionSelected(directionId)
+      -onRouteStopSelected(stop)
+      -refreshMapOverlay()
+      -startRealtimeUpdates()
     }
 
     class ControllerDataLoader {
@@ -82,82 +97,329 @@ classDiagram
     }
 
     class ControllerDataContext {
+      -List~Stop~ stops
+      -List~Trip~ trips
+      -TripMatcher tripMatcher
+      -StopTripMapper stopTripMapper
+      -RouteService routeService
+      -ArrivalService arrivalService
       +getStops()
       +getTrips()
+      +getTripMatcher()
       +getStopTripMapper()
       +getRouteService()
       +getArrivalService()
     }
 
     class RealtimeUpdateScheduler {
-      +start(...)
+      -Timer timer
+      +start(view, trips, stopTripMapper, arrivalService, modeSupplier, feedTsConsumer, positionsConsumer)
       +stop()
-      +refreshMapOverlay(...)
+      +refreshMapOverlay(view, trips, mode, positionsConsumer)
+      -runCycle(view, trips, stopTripMapper, arrivalService, modeSupplier, feedTsConsumer, positionsConsumer)
     }
 
-    class RouteViewportNavigator {
-      +centerOnStop(...)
-      +centerOnStopWithBottomAnchor(...)
-      +fitMapToRoute(...)
+    class RoutePanelFlow {
+      -MainView view
+      -ControllerDataContext dataContext
+      -RouteViewportNavigator routeViewport
+      -RoutePanelState routePanelState
+      +chooseInitialDirection(directions)
+      +closeRoutePanelOverlay(hideFloatingPanel)
+      +resetRoutePanelUiState()
+      +applyRouteSelectionStateAndView(routeId, routeName, routeStops, routeShape, directions, selectedDirection, hideFloatingPanel)
     }
 
-    class RouteVehicleMarkerBuilder {
-      +buildForRoute(...)
+    class StopPanelFlow {
+      -MainView view
+      -ControllerDataContext dataContext
+      +refreshFloatingPanelIfVisible(mode, currentFeedTs)
+      +showFloatingArrivals(stop, mode, currentFeedTs)
+      -findStopById(stopId)
+      -showPanel(stop, arrivi, isFavorite)
     }
 
-    class MainView
-    class ArrivalService
-    class RouteService
-    class RealtimeService
-    class GtfsParser
-    class MapOverlayManager
-    class MapAnimator
-    class StopTripMapper
-    class TripMatcher
+    class VehicleFollowFlow {
+      -MainView view
+      -RouteViewportNavigator routeViewport
+      -VehicleTrackingResolver vehicleTrackingResolver
+      -RoutePanelState routePanelState
+      -FollowedVehicleState followedVehicleState
+      -VehiclePanelInfoBuilder vehiclePanelInfoBuilder
+      +onRouteVehicleSelected(marker)
+      +onVehiclePositionsUpdated(positions, routeVehicleMarkerBuilder)
+      +clearFollowedVehicle()
+      +clearFollowedVehicle(hidePanel)
+      -updateFollowedVehicleTracking(positions, animate)
+    }
+
+    class RoutePanelState {
+      -String routeId
+      -List~Stop~ routeStops
+      -Integer direction
+      -String routeName
+      -boolean circular
+      +apply(routeId, routeName, routeStops, direction, circular)
+      +reset()
+      +routeId()
+      +routeStops()
+      +direction()
+      +routeName()
+      +isCircular()
+      +hasRoute()
+    }
+
+    class FollowedVehicleState {
+      -String markerId
+      -int missCount
+      +follow(markerId)
+      +clear()
+      +markerId()
+      +resetMisses()
+      +incrementMissAndReached(threshold)
+    }
+
+    class VehicleTrackingResolver {
+      +findByMarkerId(markerId, positions, routeFilter, directionFilter, tripMatcher)
+    }
+
+    class VehiclePanelInfoBuilder {
+      -ControllerDataContext dataContext
+      +build(vehiclePosition) VehiclePanelInfo
+    }
+
+    class MainView {
+      -SearchOverlaySection searchOverlaySection
+      -FloatingPanelSection floatingPanelSection
+      -RoutePanelSection routePanelSection
+      +init()
+      +showSearchOverlay()
+      +setSearchData(stops, lines)
+      +setOnSearchSelect(callback)
+      +showInfoOverlay()
+      +showFloatingPanel(stopName, stopId, arrivi, isFavorite, pos, anchorGeo)
+      +showVehicleFloatingPanel(title, rows, anchorGeo)
+      +refreshVehicleFloatingPanel(title, rows, anchorGeo)
+      +refreshFloatingPanel(stopName, stopId, arrivi, isFavorite)
+      +showAllTripsInPanel(allTrips)
+      +showRouteSidePanel(routeName, routeStops)
+      +setRouteSidePanelDirections(directions, selectedDirection)
+      +updateRouteSidePanelVehicles(markers)
+      +hideRouteSidePanel()
+      +hideFloatingPanel()
+      +showBottomNotice(message)
+    }
+
+    class SearchOverlaySection {
+      -SearchOverlay searchOverlay
+      -InfoOverlay infoOverlay
+      +initialize(hostPane, width, height)
+      +updateBounds(width, height)
+      +showSearchOverlay()
+      +showInfoOverlay()
+      +setSearchData(stops, lines)
+      +setOnSearchSelect(callback)
+      +setOnFavoritesLoginRequired(callback)
+      +showFavorites(favorites)
+    }
+
+    class FloatingPanelSection {
+      -FloatingArrivalPanel floatingPanel
+      -FloatingPanelCoordinator coordinator
+      +setOnClose(callback)
+      +setPreferredMaxRows(maxRows)
+      +setOnFavoriteToggle(callback)
+      +setOnViewAllTrips(callback)
+      +showStopPanel(stopName, stopId, arrivals, isFavorite, position, anchorGeo)
+      +refreshStopPanel(stopName, stopId, arrivals, isFavorite)
+      +showVehiclePanel(title, rows, anchorGeo)
+      +refreshVehiclePanel(title, rows, anchorGeo)
+      +showAllTrips(allTrips)
+      +updatePosition()
+      +hide()
+      +isVisible()
+      +getCurrentStopId()
+    }
+
+    class RoutePanelSection {
+      -RouteSidePanelCoordinator coordinator
+      +setOnClose(callback)
+      +setOnDirectionSelected(callback)
+      +setOnVehicleMarkerSelected(callback)
+      +setOnStopSelected(callback)
+      +updateBounds(hostWidth, hostHeight)
+      +showRoute(routeName, routeStops)
+      +setDirections(directions, selectedDirection)
+      +setVehicleMarkers(markers)
+      +hide()
+    }
+
+    class FloatingPanelCoordinator {
+      -GeoPosition floatingAnchorGeo
+      +showStopPanel(stopName, stopId, arrivals, isFavorite, pos, anchorGeo)
+      +refreshStopPanel(stopName, stopId, arrivals, isFavorite)
+      +showVehiclePanel(panelTitle, rows, anchorGeo)
+      +refreshVehiclePanel(panelTitle, rows, anchorGeo)
+      +showAllTrips(allTrips)
+      +updatePosition()
+      +hide()
+      +isVisible()
+      +getCurrentStopId()
+      +clearAnchor()
+    }
+
+    class RouteSidePanelCoordinator {
+      -RouteSidePanel panel
+      +setOnClose(callback)
+      +setOnDirectionSelected(callback)
+      +setOnVehicleMarkerSelected(callback)
+      +setOnStopSelected(callback)
+      +updateBounds(hostWidth, hostHeight)
+      +showRoute(routeName, routeStops)
+      +setDirections(directions, selectedDirection)
+      +setVehicleMarkers(markers)
+      +hide()
+    }
+
+    class ArrivalService {
+      -Map realtimeArrivals
+      -Map realtimeArrivalsByRoute
+      -TripMatcher matcher
+      -StopTripMapper stopTripMapper
+      -TripServiceCalendar tripServiceCalendar
+      -RouteFallbackPredictionAssigner routeFallbackPredictionAssigner
+      +updateRealtimeArrivals(updates)
+      +updateRealtimeArrivals(updates, referenceEpochSeconds)
+      +computeArrivalsForStop(stopId, mode, currentFeedTs)
+      +getAllTripsForStopToday(stopId, mode, currentFeedTs)
+      -lookupRealtimeArrivalEpochByTripAndStop(stopTime, stopId)
+    }
+
+    class RouteFallbackPredictionAssigner {
+      +lookupRouteFallbackArrivalEpoch(stopId, routeId, scheduledEpoch)
+      +assignRouteFallbackPredictions(stopId, allTrips)
+    }
+
+    class ArrivalFormattingSupport {
+      +formatTripInfo(info)
+      +formatArrivalInfo(info, nowEpochSeconds)
+    }
+
+    class RouteService {
+      +findRepresentativeTrip(routeId, headsign)
+      +findTripsByRouteId(routeId)
+      +getStopsForTrip(tripId)
+      +getStopsForRoute(routeId)
+      +getStopsForRouteAndDirection(routeId, directionId)
+      +getShapeForRoute(routeId)
+      +getShapeForRouteAndDirection(routeId, directionId)
+      +getHeadsignsForRoute(routeId)
+      +getDirectionsForRoute(routeId)
+      +getRepresentativeHeadsignForRouteAndDirection(routeId, directionId)
+    }
+
+    class MapOverlayManager {
+      +updateMap(mapViewer, highlightedStops, vehicles, trips)
+      +setRoute(routeStops, routeShape)
+      +clearRoute()
+      +setBusRouteFilter(routeId)
+      +setBusDirectionFilter(direction)
+      +clearBusRouteFilter()
+      +clearBusDirectionFilter()
+      +setSelectedVehicleMarkerId(markerId)
+      +clearSelectedVehicleMarkerId()
+    }
+
+    class RealtimeService {
+      +startPolling()
+      +stopPolling()
+      +getLatestTripUpdates()
+      +getLatestVehiclePositions()
+      +hasRealTimeData()
+    }
+
+    class StopTripMapper {
+      +getStopTimesForStop(stopId)
+      +getStopTimesForTrip(tripId)
+    }
+
+    class TripMatcher {
+      +matchByTripId(tripId)
+      +matchByTripIdAndRoute(tripId, routeId, directionId)
+    }
+
+    class SearchOverlay
+    class InfoOverlay
+    class FloatingArrivalPanel
+    class RouteSidePanel
 
     DamoseApp --> MainController
+
     MainController --> ControllerDataLoader
     MainController --> ControllerDataContext
     MainController --> RealtimeUpdateScheduler
     MainController --> RouteViewportNavigator
     MainController --> RouteVehicleMarkerBuilder
+    MainController --> VehiclePanelInfoBuilder
+    MainController --> RoutePanelFlow
+    MainController --> StopPanelFlow
+    MainController --> VehicleFollowFlow
+    MainController --> VehicleTrackingResolver
+    MainController --> RoutePanelState
     MainController --> MainView
     MainController --> RealtimeService
-    RouteViewportNavigator --> MapAnimator
-    RouteVehicleMarkerBuilder --> TripMatcher
+
+    ControllerDataLoader --> ControllerDataContext
+    ControllerDataContext --> StopTripMapper
+    ControllerDataContext --> RouteService
+    ControllerDataContext --> ArrivalService
+    ControllerDataContext --> TripMatcher
+
     RealtimeUpdateScheduler --> RealtimeService
-    RealtimeUpdateScheduler --> GtfsParser
     RealtimeUpdateScheduler --> ArrivalService
     RealtimeUpdateScheduler --> MapOverlayManager
-    ControllerDataLoader --> StopTripMapper
-    ControllerDataLoader --> RouteService
-    ControllerDataLoader --> ArrivalService
-```
 
-### UML Sequence Diagram (Avvio e primo ciclo realtime)
-```mermaid
-sequenceDiagram
-    participant A as DamoseApp
-    participant C as MainController
-    participant L as ControllerDataLoader
-    participant V as MainView
-    participant R as RealtimeService
-    participant S as RealtimeUpdateScheduler
-    participant AS as ArrivalService
+    RoutePanelFlow --> MainView
+    RoutePanelFlow --> ControllerDataContext
+    RoutePanelFlow --> RouteViewportNavigator
+    RoutePanelFlow --> RoutePanelState
+    RoutePanelFlow --> MapOverlayManager
 
-    A->>C: start()
-    C->>L: load()
-    L-->>C: ControllerDataContext
-    C->>V: init() e setup listener
-    C->>R: startPolling()
-    C->>S: start(...)
+    StopPanelFlow --> MainView
+    StopPanelFlow --> ControllerDataContext
 
-    loop ogni 30s
-      S->>R: getLatestTripUpdates()
-      S->>R: getLatestVehiclePositions()
-      S->>AS: updateRealtimeArrivals(...)
-      S->>V: update mappa (invokeLater)
-    end
+    VehicleFollowFlow --> MainView
+    VehicleFollowFlow --> RouteViewportNavigator
+    VehicleFollowFlow --> VehicleTrackingResolver
+    VehicleFollowFlow --> RoutePanelState
+    VehicleFollowFlow --> FollowedVehicleState
+    VehicleFollowFlow --> VehiclePanelInfoBuilder
+    VehicleFollowFlow --> MapOverlayManager
+
+    VehicleTrackingResolver --> TripMatcher
+    VehiclePanelInfoBuilder --> ControllerDataContext
+
+    MainView --> SearchOverlaySection
+    MainView --> FloatingPanelSection
+    MainView --> RoutePanelSection
+
+    SearchOverlaySection --> SearchOverlay
+    SearchOverlaySection --> InfoOverlay
+
+    FloatingPanelSection --> FloatingPanelCoordinator
+    FloatingPanelSection --> FloatingArrivalPanel
+
+    RoutePanelSection --> RouteSidePanelCoordinator
+    RouteSidePanelCoordinator --> RouteSidePanel
+
+    FloatingPanelCoordinator --> FloatingArrivalPanel
+
+    ArrivalService --> RouteFallbackPredictionAssigner
+    ArrivalService --> ArrivalFormattingSupport
+    ArrivalService --> StopTripMapper
+    ArrivalService --> TripMatcher
+
+    RouteService --> TripMatcher
 ```
 
 ## Struttura Progetto (sintesi)
@@ -186,6 +448,5 @@ mvn exec:java
 - GTFS statico locale in `src/main/resources/gtfs_static/`.
 
 ## Documentazione Aggiuntiva
-- `docs/Relazione_Tecnica.pdf`: relazione tecnica del progetto.
 - `docs/javadoc/index.html`: documentazione API generata.
-- `docs/ClassDiagram_Structured.pdf`: diagramma classi strutturato (versione aggiornata).
+- `docs/ClassDiagram_Structured.pdf`: unico diagramma UML mantenuto.

@@ -1,11 +1,7 @@
 package damose.controller;
 
-import java.awt.geom.Point2D;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -20,7 +16,6 @@ import damose.model.ConnectionMode;
 import damose.model.Route;
 import damose.model.Stop;
 import damose.model.VehiclePosition;
-import damose.model.VehicleType;
 import damose.service.FavoritesService;
 import damose.service.RealtimeService;
 import damose.util.MemoryManager;
@@ -31,23 +26,25 @@ import damose.view.map.MapOverlayManager;
  * Main application controller and coordination logic.
  */
 public class MainController {
-
     private final ControllerDataLoader dataLoader = new ControllerDataLoader();
     private final RealtimeUpdateScheduler realtimeScheduler = new RealtimeUpdateScheduler();
     private final RouteViewportNavigator routeViewport = new RouteViewportNavigator();
+    private final BackgroundTaskRunner backgroundRunner = new BackgroundTaskRunner("main-controller");
+    private final VehicleTrackingResolver vehicleTrackingResolver = new VehicleTrackingResolver();
+    private final RoutePanelState routePanelState = new RoutePanelState();
 
     private ControllerDataContext dataContext;
     private RouteVehicleMarkerBuilder routeVehicleMarkerBuilder;
+    private VehiclePanelInfoBuilder vehiclePanelInfoBuilder;
+    private RoutePanelFlow routePanelFlow;
+    private StopPanelFlow stopPanelFlow;
+    private VehicleFollowFlow vehicleFollowFlow;
     private ConnectionMode mode = ConnectionMode.ONLINE;
+    private boolean autoOfflineNoticeShown = false;
     private MainView view;
     private volatile long currentFeedTs = Instant.now().getEpochSecond();
 
     private List<Stop> linesList;
-    private volatile String activeRoutePanelId;
-    private volatile List<Stop> activeRoutePanelStops = Collections.emptyList();
-    private volatile Integer activeRoutePanelDirection;
-    private volatile String activeRoutePanelName;
-    private volatile boolean activeRoutePanelCircular;
 
     /**
      * Handles start.
@@ -60,22 +57,27 @@ public class MainController {
                 dataContext.getTripMatcher(),
                 RoutesLoader::getRouteById
         );
+        vehiclePanelInfoBuilder = new VehiclePanelInfoBuilder(dataContext, () -> currentFeedTs);
 
         view = new MainView();
         view.init();
         view.setAllStops(dataContext.getStops());
+        routePanelFlow = new RoutePanelFlow(view, dataContext, routeViewport, routePanelState, this::refreshMapOverlay);
+        stopPanelFlow = new StopPanelFlow(view, dataContext);
+        vehicleFollowFlow = new VehicleFollowFlow(
+                view,
+                routeViewport,
+                vehicleTrackingResolver,
+                routePanelState,
+                new FollowedVehicleState(),
+                vehiclePanelInfoBuilder,
+                () -> dataContext != null ? dataContext.getTripMatcher() : null
+        );
 
         setupSearchPanel();
 
         FavoritesService.init(dataContext.getStops(), linesList);
-        setupStopClickListener();
-        setupConnectionButton();
-        setupFavoritesButton();
-        setupFloatingPanelFavorite();
-        setupFloatingPanelClose();
-        setupRoutePanelClose();
-        setupRouteDirectionSwitch();
-        setupBusToggleButton();
+        setupViewCallbacks();
 
         view.addWaypointClickListener();
         MapOverlayManager.updateMap(
@@ -92,14 +94,26 @@ public class MainController {
         System.out.println(MemoryManager.getMemoryInfo());
     }
 
+    private void setupViewCallbacks() {
+        setupStopClickListener();
+        setupConnectionButton();
+        setupFavoritesButton();
+        setupFloatingPanelFavorite();
+        setupFloatingPanelClose();
+        setupRoutePanelClose();
+        setupRouteDirectionSwitch();
+        setupRouteVehicleSelection();
+        setupRouteStopSelection();
+        setupBusToggleButton();
+    }
+
     private void checkInitialConnectionMode() {
         System.out.println("Checking RT data availability...");
         view.getConnectionButton().showConnecting();
 
-        new Thread(() -> {
+        backgroundRunner.run(() -> {
             RealtimeService.setMode(ConnectionMode.ONLINE);
             RealtimeService.startPolling();
-
             try {
                 Thread.sleep(3000);
             } catch (InterruptedException ignored) {
@@ -107,8 +121,9 @@ public class MainController {
 
             boolean hasData = RealtimeService.hasRealTimeData();
 
+            final boolean initialHasData = hasData;
             SwingUtilities.invokeLater(() -> {
-                if (hasData) {
+                if (initialHasData) {
                     mode = ConnectionMode.ONLINE;
                     view.getConnectionButton().setOnline();
                     System.out.println("RT data available - Starting in Online mode");
@@ -123,7 +138,7 @@ public class MainController {
                 refreshMapOverlay();
                 startRealtimeUpdates();
             });
-        }, "initial-connection-check").start();
+        });
     }
 
     private void setupConnectionButton() {
@@ -196,7 +211,7 @@ public class MainController {
             RealtimeService.setMode(ConnectionMode.ONLINE);
             RealtimeService.startPolling();
 
-            new Thread(() -> {
+            backgroundRunner.run(() -> {
                 try {
                     Thread.sleep(2500);
 
@@ -205,10 +220,15 @@ public class MainController {
                         if (hasData) {
                             mode = ConnectionMode.ONLINE;
                             view.getConnectionButton().setOnline();
+                            autoOfflineNoticeShown = false;
                             System.out.println("Connected successfully - Online mode active");
-                            refreshFloatingPanelIfVisible();
+                            if (stopPanelFlow != null) {
+                                stopPanelFlow.refreshFloatingPanelIfVisible(mode, currentFeedTs);
+                            }
                         } else {
                             mode = ConnectionMode.OFFLINE;
+                            RealtimeService.setMode(ConnectionMode.OFFLINE);
+                            RealtimeService.stopPolling();
                             view.getConnectionButton().setOffline();
                             System.out.println("Connection failed - Staying offline");
 
@@ -223,7 +243,7 @@ public class MainController {
                     });
                 } catch (InterruptedException ignored) {
                 }
-            }, "connection-toggle-check").start();
+            });
         } else {
             mode = ConnectionMode.OFFLINE;
             RealtimeService.setMode(ConnectionMode.OFFLINE);
@@ -232,31 +252,12 @@ public class MainController {
             SwingUtilities.invokeLater(() -> {
                 view.getConnectionButton().setOffline();
                 refreshMapOverlay();
-                refreshFloatingPanelIfVisible();
+                if (stopPanelFlow != null) {
+                    stopPanelFlow.refreshFloatingPanelIfVisible(mode, currentFeedTs);
+                }
                 System.out.println("Offline mode active");
             });
         }
-    }
-
-    private void refreshFloatingPanelIfVisible() {
-        String stopId = view.getFloatingPanelStopId();
-        if (stopId != null && view.isFloatingPanelVisible()) {
-            Stop stop = findStopById(stopId);
-            if (stop != null) {
-                List<String> arrivi = dataContext.getArrivalService()
-                        .computeArrivalsForStop(stopId, mode, currentFeedTs);
-                boolean isFavorite = FavoritesService.isFavorite(stopId);
-                view.refreshFloatingPanel(stop.getStopName(), stopId, arrivi, isFavorite);
-            }
-        }
-    }
-
-    private Stop findStopById(String stopId) {
-        if (stopId == null || dataContext.getStops() == null) return null;
-        for (Stop s : dataContext.getStops()) {
-            if (stopId.equals(s.getStopId())) return s;
-        }
-        return null;
     }
 
     private void setupStopClickListener() {
@@ -268,6 +269,7 @@ public class MainController {
 
     private void setupFloatingPanelClose() {
         view.setOnFloatingPanelClose(() -> {
+            clearFollowedVehicle();
             MapOverlayManager.clearVisibleStops();
             refreshMapOverlay();
         });
@@ -275,15 +277,10 @@ public class MainController {
 
     private void setupRoutePanelClose() {
         view.setOnRoutePanelClose(() -> {
-            activeRoutePanelId = null;
-            activeRoutePanelStops = Collections.emptyList();
-            activeRoutePanelDirection = null;
-            activeRoutePanelName = null;
-            activeRoutePanelCircular = false;
-            view.hideRouteSidePanel();
-            MapOverlayManager.clearRoute();
-            MapOverlayManager.clearBusRouteFilter();
-            MapOverlayManager.clearBusDirectionFilter();
+            clearFollowedVehicle(true);
+            if (routePanelFlow != null) {
+                routePanelFlow.closeRoutePanelOverlay(true);
+            }
             MapOverlayManager.clearVisibleStops();
             refreshMapOverlay();
         });
@@ -293,29 +290,21 @@ public class MainController {
         view.setOnRouteDirectionSelected(this::onRouteDirectionSelected);
     }
 
+    private void setupRouteVehicleSelection() {
+        view.setOnRouteVehicleSelected(marker -> {
+            if (vehicleFollowFlow != null) {
+                vehicleFollowFlow.onRouteVehicleSelected(marker);
+            }
+        });
+    }
+
+    private void setupRouteStopSelection() {
+        view.setOnRouteStopSelected(this::onRouteStopSelected);
+    }
+
     private void setupSearchPanel() {
         Map<String, Route> routesById = RoutesLoader.getRoutesById();
-        linesList = routesById.values().stream()
-                .map(route -> {
-                    String shortName = safe(route.getRouteShortName());
-                    String longName = safe(route.getRouteLongName());
-                    String displayName = shortName.isEmpty() ? route.getRouteId() : shortName;
-                    if (!longName.isEmpty() && !longName.equalsIgnoreCase(displayName)) {
-                        displayName = displayName + " - " + longName;
-                    }
-
-                    Stop line = new Stop(
-                            route.getRouteId(),
-                            String.valueOf(route.getVehicleType().getGtfsCode()),
-                            displayName,
-                            0.0,
-                            0.0
-                    );
-                    line.markAsFakeLine();
-                    return line;
-                })
-                .sorted(Comparator.comparing(Stop::getStopName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
+        linesList = LineSearchDataBuilder.build(routesById);
 
         view.setSearchData(dataContext.getStops(), linesList);
         view.getSearchButton().addActionListener(e -> view.showSearchOverlay());
@@ -332,34 +321,34 @@ public class MainController {
         if (stop.isFakeLine()) {
             handleLineSelection(stop);
         } else {
-            activeRoutePanelId = null;
-            activeRoutePanelStops = Collections.emptyList();
-            activeRoutePanelDirection = null;
-            activeRoutePanelName = null;
-            activeRoutePanelCircular = false;
-            view.hideRouteSidePanel();
-            MapOverlayManager.clearRoute();
-            MapOverlayManager.clearBusRouteFilter();
-            MapOverlayManager.clearBusDirectionFilter();
+            clearFollowedVehicle(true);
+            if (routePanelFlow != null) {
+                routePanelFlow.closeRoutePanelOverlay(false);
+            }
             MapOverlayManager.setVisibleStops(Collections.singletonList(stop));
             if (fromSearch) {
                 routeViewport.centerOnStopWithBottomAnchor(view.getMapViewer(), stop);
             } else {
                 routeViewport.centerOnStop(view.getMapViewer(), stop);
             }
-            showFloatingArrivals(stop);
+            if (stopPanelFlow != null) {
+                stopPanelFlow.showFloatingArrivals(stop, mode, currentFeedTs);
+            }
             refreshMapOverlay();
         }
     }
 
     private void handleLineSelection(Stop fakeLine) {
+        clearFollowedVehicle(true);
         String routeId = fakeLine.getStopId();
         String routeName = fakeLine.getStopName();
 
-        new Thread(() -> {
+        backgroundRunner.run(() -> {
             try {
                 List<Integer> directions = dataContext.getRouteService().getDirectionsForRoute(routeId);
-                Integer initialDirection = chooseInitialDirection(directions);
+                Integer initialDirection = routePanelFlow != null
+                        ? routePanelFlow.chooseInitialDirection(directions)
+                        : null;
 
                 List<Stop> routeStops = initialDirection == null
                         ? dataContext.getRouteService().getStopsForRoute(routeId)
@@ -369,41 +358,25 @@ public class MainController {
                         : dataContext.getRouteService().getShapeForRouteAndDirection(routeId, initialDirection);
                 if (routeStops.isEmpty()) {
                     SwingUtilities.invokeLater(() -> {
-                        activeRoutePanelId = null;
-                        activeRoutePanelStops = Collections.emptyList();
-                        activeRoutePanelDirection = null;
-                        activeRoutePanelName = null;
-                        activeRoutePanelCircular = false;
-                        view.hideRouteSidePanel();
-                        MapOverlayManager.clearBusDirectionFilter();
+                        if (routePanelFlow != null) {
+                            routePanelFlow.resetRoutePanelUiState();
+                        }
                     });
                     return;
                 }
 
-                boolean circularRoute = isCircularRoute(routeStops);
-                List<Integer> effectiveDirections = normalizeDirectionsForCircular(
-                        directions, initialDirection, circularRoute
-                );
-
                 SwingUtilities.invokeLater(() -> {
-                    activeRoutePanelId = routeId;
-                    activeRoutePanelStops = new ArrayList<>(routeStops);
-                    activeRoutePanelDirection = initialDirection;
-                    activeRoutePanelName = routeName;
-                    activeRoutePanelCircular = circularRoute;
-
-                    Map<Integer, String> directionLabels = buildDirectionLabels(routeId, effectiveDirections);
-                    view.setRouteSidePanelDirections(directionLabels, initialDirection != null ? initialDirection : 0);
-                    view.showRouteSidePanel(routeName, routeStops);
-
-                    MapOverlayManager.clearVisibleStops();
-                    MapOverlayManager.setRouteStyleForVehicleType(resolveRouteVehicleType(routeId));
-                    MapOverlayManager.setRoute(routeStops, routeShape);
-                    MapOverlayManager.setBusRouteFilter(routeId);
-                    MapOverlayManager.setBusDirectionFilter(initialDirection);
-                    refreshMapOverlay();
-                    routeViewport.fitMapToRoute(view.getMapViewer(), routeStops, activeRoutePanelId != null);
-                    view.hideFloatingPanel();
+                    if (routePanelFlow != null) {
+                        routePanelFlow.applyRouteSelectionStateAndView(
+                                routeId,
+                                routeName,
+                                routeStops,
+                                routeShape,
+                                directions,
+                                initialDirection,
+                                true
+                        );
+                    }
                 });
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -414,127 +387,67 @@ public class MainController {
                         JOptionPane.ERROR_MESSAGE
                 ));
                 SwingUtilities.invokeLater(() -> {
-                    activeRoutePanelId = null;
-                    activeRoutePanelStops = Collections.emptyList();
-                    activeRoutePanelDirection = null;
-                    activeRoutePanelName = null;
-                    activeRoutePanelCircular = false;
-                    view.hideRouteSidePanel();
-                    MapOverlayManager.clearBusDirectionFilter();
+                    if (routePanelFlow != null) {
+                        routePanelFlow.resetRoutePanelUiState();
+                    }
                 });
             }
-        }, "line-selection-" + routeId).start();
-    }
-
-    private static String safe(String value) {
-        return value == null ? "" : value.trim();
-    }
-
-    private VehicleType resolveRouteVehicleType(String routeId) {
-        Route route = RoutesLoader.getRouteById(routeId);
-        return route != null ? route.getVehicleType() : VehicleType.BUS;
-    }
-
-    private Integer chooseInitialDirection(List<Integer> directions) {
-        if (directions == null || directions.isEmpty()) return null;
-        if (directions.contains(0)) return 0;
-        return directions.get(0);
-    }
-
-    private static boolean isCircularRoute(List<Stop> routeStops) {
-        if (routeStops == null || routeStops.size() < 2) return false;
-
-        Stop first = routeStops.get(0);
-        Stop last = routeStops.get(routeStops.size() - 1);
-        if (first == null || last == null) return false;
-
-        String firstId = first.getStopId();
-        String lastId = last.getStopId();
-        if (firstId != null && lastId != null
-                && firstId.trim().equalsIgnoreCase(lastId.trim())) {
-            return true;
-        }
-
-        double latDiff = Math.abs(first.getStopLat() - last.getStopLat());
-        double lonDiff = Math.abs(first.getStopLon() - last.getStopLon());
-        return latDiff < 0.0001 && lonDiff < 0.0001;
-    }
-
-    private static List<Integer> normalizeDirectionsForCircular(List<Integer> directions,
-                                                                Integer selectedDirection,
-                                                                boolean circularRoute) {
-        if (!circularRoute || directions == null || directions.size() <= 1) {
-            return directions;
-        }
-
-        if (selectedDirection != null) {
-            return List.of(selectedDirection);
-        }
-        return List.of(directions.get(0));
-    }
-
-    private Map<Integer, String> buildDirectionLabels(String routeId, List<Integer> directions) {
-        Map<Integer, String> labels = new LinkedHashMap<>();
-        if (directions == null) return labels;
-
-        for (Integer direction : directions) {
-            if (direction == null) continue;
-            String headsign = safe(dataContext.getRouteService()
-                    .getRepresentativeHeadsignForRouteAndDirection(routeId, direction));
-            String label = !headsign.isEmpty() ? headsign : "Direzione";
-            labels.put(direction, label);
-        }
-        return labels;
+        });
     }
 
     private void onRouteDirectionSelected(int directionId) {
-        if (activeRoutePanelCircular) return;
+        if (routePanelState.isCircular()) return;
+        clearFollowedVehicle(true);
 
-        String routeId = activeRoutePanelId;
-        String routeName = activeRoutePanelName;
+        String routeId = routePanelState.routeId();
+        String routeName = routePanelState.routeName();
         if (routeId == null || routeName == null) return;
 
-        new Thread(() -> {
+        backgroundRunner.run(() -> {
             List<Stop> routeStops = dataContext.getRouteService().getStopsForRouteAndDirection(routeId, directionId);
             List<GeoPosition> routeShape = dataContext.getRouteService()
                     .getShapeForRouteAndDirection(routeId, directionId);
             if (routeStops.isEmpty()) return;
 
             SwingUtilities.invokeLater(() -> {
-                activeRoutePanelDirection = directionId;
-                activeRoutePanelStops = new ArrayList<>(routeStops);
-                activeRoutePanelCircular = isCircularRoute(routeStops);
-                view.showRouteSidePanel(routeName, routeStops);
-
                 List<Integer> directions = dataContext.getRouteService().getDirectionsForRoute(routeId);
-                List<Integer> effectiveDirections = normalizeDirectionsForCircular(
-                        directions, directionId, activeRoutePanelCircular
-                );
-                view.setRouteSidePanelDirections(buildDirectionLabels(routeId, effectiveDirections), directionId);
-
-                MapOverlayManager.clearVisibleStops();
-                MapOverlayManager.setRouteStyleForVehicleType(resolveRouteVehicleType(routeId));
-                MapOverlayManager.setRoute(routeStops, routeShape);
-                MapOverlayManager.setBusRouteFilter(routeId);
-                MapOverlayManager.setBusDirectionFilter(directionId);
-                refreshMapOverlay();
-                routeViewport.fitMapToRoute(view.getMapViewer(), routeStops, activeRoutePanelId != null);
+                if (routePanelFlow != null) {
+                    routePanelFlow.applyRouteSelectionStateAndView(
+                            routeId,
+                            routeName,
+                            routeStops,
+                            routeShape,
+                            directions,
+                            directionId,
+                            false
+                    );
+                }
             });
-        }, "route-direction-" + routeId + "-" + directionId).start();
+        });
     }
 
-    private void showFloatingArrivals(Stop stop) {
-        List<String> arrivi = dataContext.getArrivalService()
-                .computeArrivalsForStop(stop.getStopId(), mode, currentFeedTs);
-        boolean isFavorite = FavoritesService.isFavorite(stop.getStopId());
-        showPanel(stop, arrivi, isFavorite);
+    private void onRouteStopSelected(Stop stop) {
+        if (stop == null) return;
+
+        clearFollowedVehicle(true);
+        MapOverlayManager.setVisibleStops(Collections.singletonList(stop));
+        routeViewport.centerOnStop(view.getMapViewer(), stop);
+        if (stopPanelFlow != null) {
+            stopPanelFlow.showFloatingArrivals(stop, mode, currentFeedTs);
+        }
+        refreshMapOverlay();
     }
 
-    private void showPanel(Stop stop, List<String> arrivi, boolean isFavorite) {
-        GeoPosition anchorGeo = new GeoPosition(stop.getStopLat(), stop.getStopLon());
-        Point2D p2d = view.getMapViewer().convertGeoPositionToPoint(anchorGeo);
-        SwingUtilities.invokeLater(() -> view.showFloatingPanel(
-                stop.getStopName(), stop.getStopId(), arrivi, isFavorite, p2d, anchorGeo));
+    private void clearFollowedVehicle() {
+        if (vehicleFollowFlow != null) {
+            vehicleFollowFlow.clearFollowedVehicle();
+        }
+    }
+
+    private void clearFollowedVehicle(boolean hidePanel) {
+        if (vehicleFollowFlow != null) {
+            vehicleFollowFlow.clearFollowedVehicle(hidePanel);
+        }
     }
 
     private void refreshMapOverlay() {
@@ -549,21 +462,49 @@ public class MainController {
                 dataContext.getArrivalService(),
                 () -> mode,
                 ts -> currentFeedTs = ts,
-                this::onVehiclePositionsUpdated
+                this::onVehiclePositionsUpdated,
+                this::onRealtimeHealthChanged
         );
     }
 
     private void onVehiclePositionsUpdated(List<VehiclePosition> positions) {
-        String routeId = activeRoutePanelId;
-        List<Stop> routeStops = activeRoutePanelStops;
-        Integer directionFilter = activeRoutePanelDirection;
-        if (routeVehicleMarkerBuilder == null || routeId == null || routeStops == null || routeStops.size() < 2) {
+        if (vehicleFollowFlow != null) {
+            vehicleFollowFlow.onVehiclePositionsUpdated(positions, routeVehicleMarkerBuilder);
+        }
+    }
+
+    private void onRealtimeHealthChanged(boolean healthy) {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(() -> onRealtimeHealthChanged(healthy));
             return;
         }
 
-        view.updateRouteSidePanelVehicles(
-                routeVehicleMarkerBuilder.buildForRoute(positions, routeId, routeStops, directionFilter)
-        );
+        if (mode != ConnectionMode.ONLINE) {
+            return;
+        }
+
+        if (RealtimeService.getLastSuccessfulFetchEpochSeconds() == Long.MIN_VALUE) {
+            return;
+        }
+
+        if (healthy) {
+            autoOfflineNoticeShown = false;
+            return;
+        }
+
+        mode = ConnectionMode.OFFLINE;
+        RealtimeService.setMode(ConnectionMode.OFFLINE);
+        RealtimeService.stopPolling();
+        view.getConnectionButton().setOffline();
+        if (!autoOfflineNoticeShown) {
+            autoOfflineNoticeShown = true;
+            view.showBottomNotice("Feed realtime non disponibile. Passaggio automatico in modalita offline.");
+        }
+        if (stopPanelFlow != null) {
+            stopPanelFlow.refreshFloatingPanelIfVisible(mode, currentFeedTs);
+        }
+        refreshMapOverlay();
+        System.out.println("Realtime feed unavailable - switched to Offline mode");
     }
 }
 

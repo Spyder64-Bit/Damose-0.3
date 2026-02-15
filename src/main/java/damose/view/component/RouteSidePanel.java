@@ -1,6 +1,5 @@
 package damose.view.component;
 
-import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
@@ -9,30 +8,31 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Image;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
-import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
+import javax.swing.Scrollable;
+import javax.swing.ScrollPaneConstants;
 import javax.swing.border.EmptyBorder;
 
 import damose.config.AppConstants;
@@ -101,14 +101,18 @@ public class RouteSidePanel extends JPanel {
     private final JButton closeButton;
     private final JButton directionSwitchButton;
     private final JPanel titleRow;
-    private final TimelineCanvas timelineCanvas;
+    private final RouteTimelineCanvas timelineCanvas;
     private final JScrollPane scrollPane;
+    private final JPanel scrollContent;
 
     private final List<Stop> routeStops = new ArrayList<>();
     private final List<VehicleMarker> vehicleMarkers = new ArrayList<>();
     private final Map<Integer, String> directionLabels = new LinkedHashMap<>();
+    private String selectedVehicleMarkerId;
     private Runnable onClose;
     private IntConsumer onDirectionSelected;
+    private Consumer<VehicleMarker> onVehicleMarkerSelected;
+    private Consumer<Stop> onStopSelected;
     private int selectedDirection = 0;
     private String routeFullName = "Linea";
     private static final Color DIRECTION_BTN_BG = new Color(34, 40, 52, 230);
@@ -123,7 +127,7 @@ public class RouteSidePanel extends JPanel {
         JPanel header = new JPanel();
         header.setOpaque(false);
         header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
-        header.setBorder(new EmptyBorder(8, 10, 8, 10));
+        header.setBorder(new EmptyBorder(0, 0, 0, 0));
 
         titleRow = new JPanel(new BorderLayout(8, 0));
         titleRow.setOpaque(false);
@@ -205,13 +209,31 @@ public class RouteSidePanel extends JPanel {
             }
         });
         header.add(directionSwitchButton);
-        add(header, BorderLayout.NORTH);
 
-        timelineCanvas = new TimelineCanvas();
+        timelineCanvas = new RouteTimelineCanvas(
+                routeStops,
+                vehicleMarkers,
+                () -> selectedVehicleMarkerId,
+                markerId -> selectedVehicleMarkerId = markerId,
+                () -> onVehicleMarkerSelected,
+                () -> onStopSelected,
+                this::getTimelineViewportWidth
+        );
         timelineCanvas.setOpaque(false);
+        timelineCanvas.setAlignmentX(LEFT_ALIGNMENT);
 
-        scrollPane = new JScrollPane(timelineCanvas);
+        scrollContent = new ScrollContentPanel();
+        scrollContent.setOpaque(false);
+        scrollContent.setLayout(new BoxLayout(scrollContent, BoxLayout.Y_AXIS));
+        scrollContent.setBorder(new EmptyBorder(8, 10, 8, 10));
+        scrollContent.add(header);
+        scrollContent.add(Box.createVerticalStrut(6));
+        scrollContent.add(timelineCanvas);
+
+        scrollPane = new JScrollPane(scrollContent);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
         scrollPane.getViewport().setOpaque(false);
         scrollPane.setOpaque(false);
         scrollPane.getVerticalScrollBar().setUnitIncrement(18);
@@ -230,6 +252,20 @@ public class RouteSidePanel extends JPanel {
      */
     public void setOnDirectionSelected(IntConsumer callback) {
         this.onDirectionSelected = callback;
+    }
+
+    /**
+     * Registers callback for vehicle marker selected.
+     */
+    public void setOnVehicleMarkerSelected(Consumer<VehicleMarker> callback) {
+        this.onVehicleMarkerSelected = callback;
+    }
+
+    /**
+     * Registers callback for stop selected.
+     */
+    public void setOnStopSelected(Consumer<Stop> callback) {
+        this.onStopSelected = callback;
     }
 
     /**
@@ -256,7 +292,9 @@ public class RouteSidePanel extends JPanel {
             routeStops.addAll(stops);
         }
         vehicleMarkers.clear();
+        selectedVehicleMarkerId = null;
         updateMeta();
+        timelineCanvas.refreshStopButtons();
         timelineCanvas.revalidate();
         timelineCanvas.repaint();
         scrollPane.getVerticalScrollBar().setValue(0);
@@ -270,6 +308,10 @@ public class RouteSidePanel extends JPanel {
         if (markers != null) {
             vehicleMarkers.addAll(markers);
         }
+        if (selectedVehicleMarkerId != null
+                && vehicleMarkers.stream().noneMatch(m -> selectedVehicleMarkerId.equalsIgnoreCase(m.getVehicleId()))) {
+            selectedVehicleMarkerId = null;
+        }
         updateMeta();
         timelineCanvas.repaint();
     }
@@ -278,53 +320,20 @@ public class RouteSidePanel extends JPanel {
         metaLabel.setText(routeStops.size() + " fermate - " + vehicleMarkers.size() + " veicoli");
     }
 
+    private int getTimelineViewportWidth() {
+        return scrollPane != null ? scrollPane.getViewport().getWidth() : 0;
+    }
+
     private void updateRouteLabelForWidth() {
         String normalized = routeFullName == null || routeFullName.isBlank() ? "Linea" : routeFullName.trim();
         int availableWidth = titleRow.getWidth() - closeButton.getPreferredSize().width - 14;
         if (availableWidth <= 30) {
-            routeLabel.setText(ellipsize(normalized, 18));
+            routeLabel.setText(RouteTextUtils.ellipsize(normalized, 18));
         } else {
             FontMetrics fm = routeLabel.getFontMetrics(routeLabel.getFont());
-            routeLabel.setText(ellipsizeToWidth(normalized, fm, availableWidth));
+            routeLabel.setText(RouteTextUtils.ellipsizeToWidth(normalized, fm, availableWidth));
         }
         routeLabel.setToolTipText(normalized);
-    }
-
-    private static String ellipsizeToWidth(String text, FontMetrics fm, int maxWidth) {
-        if (text == null || text.isEmpty()) return "";
-        if (fm.stringWidth(text) <= maxWidth) return text;
-        String suffix = "...";
-        int suffixW = fm.stringWidth(suffix);
-        if (suffixW >= maxWidth) return suffix;
-        int end = text.length();
-        while (end > 0 && fm.stringWidth(text.substring(0, end)) + suffixW > maxWidth) {
-            end--;
-        }
-        return end <= 0 ? suffix : text.substring(0, end) + suffix;
-    }
-
-    private static String ellipsize(String text, int maxChars) {
-        if (text == null) return "";
-        if (maxChars < 4 || text.length() <= maxChars) return text;
-        return text.substring(0, maxChars - 3) + "...";
-    }
-
-    private static String normalizeDirectionLabel(String label) {
-        if (label == null) return "Direzione";
-        String value = label.trim();
-        if (value.isEmpty()) return "Direzione";
-
-        if (value.matches("(?i)^dir\\s*\\d+\\s*-\\s*.+$")) {
-            int dash = value.indexOf('-');
-            value = dash >= 0 && dash + 1 < value.length() ? value.substring(dash + 1).trim() : value;
-        } else if (value.matches("^\\d+\\s*-\\s*.+$")) {
-            int dash = value.indexOf('-');
-            value = dash >= 0 && dash + 1 < value.length() ? value.substring(dash + 1).trim() : value;
-        } else if (value.matches("(?i)^dir\\s*\\d+$")) {
-            value = "Direzione";
-        }
-
-        return value.isEmpty() ? "Direzione" : value;
     }
 
     private void rebuildDirectionSwitch() {
@@ -338,8 +347,8 @@ public class RouteSidePanel extends JPanel {
             selectedDirection = directionLabels.keySet().iterator().next();
         }
 
-        String selectedLabel = normalizeDirectionLabel(directionLabels.get(selectedDirection));
-        directionSwitchButton.setText("v " + ellipsize(selectedLabel, 22));
+        String selectedLabel = RouteTextUtils.normalizeDirectionLabel(directionLabels.get(selectedDirection));
+        directionSwitchButton.setText("v " + RouteTextUtils.ellipsize(selectedLabel, 22));
         directionSwitchButton.setToolTipText(selectedLabel);
         directionSwitchButton.setVisible(true);
     }
@@ -350,8 +359,8 @@ public class RouteSidePanel extends JPanel {
         JPopupMenu menu = new JPopupMenu();
         for (Map.Entry<Integer, String> entry : directionLabels.entrySet()) {
             int directionId = entry.getKey();
-            String text = normalizeDirectionLabel(entry.getValue());
-            JMenuItem item = new JMenuItem(ellipsize(text, 36));
+            String text = RouteTextUtils.normalizeDirectionLabel(entry.getValue());
+            JMenuItem item = new JMenuItem(RouteTextUtils.ellipsize(text, 36));
             if (directionId == selectedDirection) {
                 item.setIcon(new StatusDotIcon(new Color(99, 210, 99)));
                 item.setFont(item.getFont().deriveFont(Font.BOLD));
@@ -369,33 +378,6 @@ public class RouteSidePanel extends JPanel {
             menu.add(item);
         }
         menu.show(directionSwitchButton, 0, directionSwitchButton.getHeight());
-    }
-
-    private static final class StatusDotIcon implements Icon {
-        private final Color color;
-
-        private StatusDotIcon(Color color) {
-            this.color = color;
-        }
-
-        @Override
-        public int getIconWidth() {
-            return 10;
-        }
-
-        @Override
-        public int getIconHeight() {
-            return 10;
-        }
-
-        @Override
-        public void paintIcon(java.awt.Component c, Graphics g, int x, int y) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(color);
-            g2.fillOval(x + 1, y + 1, 8, 8);
-            g2.dispose();
-        }
     }
 
     @Override
@@ -420,149 +402,33 @@ public class RouteSidePanel extends JPanel {
         return false;
     }
 
-    private final class TimelineCanvas extends JPanel {
-        private static final int LEFT_PADDING = 6;
-        private static final int LINE_X = 124;
-        private static final int STOPS_TEXT_X = 140;
-        private static final int TOP_PADDING = 24;
-        private static final int BOTTOM_PADDING = 24;
-        private static final int ROW_HEIGHT = 26;
-        private static final int STOP_DOT_SIZE = 7;
-        private static final int VEHICLE_ICON_SIZE = 18;
-        private static final int VEHICLE_LIST_ROW_HEIGHT = 28;
+    private static final class ScrollContentPanel extends JPanel implements Scrollable {
 
-        private final ImageIcon busIcon;
-        private final ImageIcon tramIcon;
-
-        private TimelineCanvas() {
-            busIcon = loadIcon("/sprites/bus.png", VEHICLE_ICON_SIZE);
-            tramIcon = loadIcon("/sprites/tram.png", VEHICLE_ICON_SIZE);
-        }
-
-        private ImageIcon loadIcon(String path, int size) {
-            try {
-                ImageIcon raw = new ImageIcon(getClass().getResource(path));
-                Image scaled = raw.getImage().getScaledInstance(size, size, Image.SCALE_SMOOTH);
-                return new ImageIcon(scaled);
-            } catch (Exception e) {
-                return null;
-            }
+        @Override
+        public Dimension getPreferredScrollableViewportSize() {
+            return getPreferredSize();
         }
 
         @Override
-        /**
-         * Returns the preferred size.
-         */
-        public Dimension getPreferredSize() {
-            int stopCount = Math.max(2, routeStops.size());
-            int routeH = TOP_PADDING + BOTTOM_PADDING + (stopCount - 1) * ROW_HEIGHT;
-            int listH = TOP_PADDING + BOTTOM_PADDING + Math.max(0, vehicleMarkers.size() - 1) * VEHICLE_LIST_ROW_HEIGHT;
-            return new Dimension(320, Math.max(routeH, listH));
+        public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
+            return 18;
         }
 
         @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
+            return Math.max(visibleRect.height - 28, 60);
+        }
 
-            int stopCount = Math.max(2, routeStops.size());
-            int topY = TOP_PADDING;
-            int bottomY = TOP_PADDING + (stopCount - 1) * ROW_HEIGHT;
+        @Override
+        public boolean getScrollableTracksViewportWidth() {
+            return true;
+        }
 
-            g2.setColor(Color.WHITE);
-            g2.setStroke(new BasicStroke(2.0f));
-            g2.drawLine(LINE_X, topY, LINE_X, bottomY);
-
-            g2.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-            for (int i = 0; i < routeStops.size(); i++) {
-                int y = TOP_PADDING + i * ROW_HEIGHT;
-                g2.setColor(Color.WHITE);
-                g2.fillOval(LINE_X - STOP_DOT_SIZE / 2, y - STOP_DOT_SIZE / 2, STOP_DOT_SIZE, STOP_DOT_SIZE);
-
-                String stopName = routeStops.get(i).getStopName();
-                if (stopName.length() > 34) {
-                    stopName = stopName.substring(0, 34) + "...";
-                }
-                g2.setColor(AppConstants.TEXT_PRIMARY);
-                g2.drawString(stopName, STOPS_TEXT_X, y + 4);
-            }
-
-            List<VehicleMarker> markers = vehicleMarkers.isEmpty()
-                    ? Collections.emptyList()
-                    : new ArrayList<>(vehicleMarkers);
-
-            for (int i = 0; i < markers.size(); i++) {
-                VehicleMarker marker = markers.get(i);
-
-                int yOnRoute = topY + (int) Math.round(marker.getProgress() * (bottomY - topY));
-                int drawX = LINE_X - VEHICLE_ICON_SIZE / 2;
-                int drawY = yOnRoute - VEHICLE_ICON_SIZE / 2;
-
-                g2.setColor(new Color(255, 255, 255, 220));
-                g2.fillOval(drawX - 2, drawY - 2, VEHICLE_ICON_SIZE + 4, VEHICLE_ICON_SIZE + 4);
-
-                ImageIcon icon = marker.getVehicleType() == VehicleType.TRAM ? tramIcon : busIcon;
-                if (icon != null) {
-                    icon.paintIcon(this, g2, drawX, drawY);
-                } else {
-                    g2.setColor(marker.getVehicleType() == VehicleType.TRAM
-                            ? new Color(255, 140, 0)
-                            : new Color(76, 175, 80));
-                    g2.fillOval(drawX, drawY, VEHICLE_ICON_SIZE, VEHICLE_ICON_SIZE);
-                }
-
-                String title = ellipsize(marker.getTitleText(), 12);
-                String details = ellipsize(marker.getDetailText(), 20);
-                if (!title.isBlank() || !details.isBlank()) {
-                    Font titleFont = new Font("Segoe UI", Font.BOLD, 9);
-                    Font detailsFont = new Font("Segoe UI", Font.PLAIN, 9);
-
-                    g2.setFont(titleFont);
-                    int titleW = g2.getFontMetrics().stringWidth(title);
-                    g2.setFont(detailsFont);
-                    int detailW = g2.getFontMetrics().stringWidth(details);
-
-                    int maxBoxW = LINE_X - LEFT_PADDING - 14;
-                    int boxW = Math.min(maxBoxW, Math.max(titleW, detailW) + 20);
-                    int boxH = 24;
-                    int boxX = LEFT_PADDING;
-                    int boxY = yOnRoute - (boxH / 2);
-                    boxY = Math.max(4, Math.min(getHeight() - boxH - 4, boxY));
-
-                    g2.setColor(new Color(20, 20, 24, 210));
-                    g2.fillRoundRect(boxX, boxY, boxW, boxH, 8, 8);
-                    g2.setColor(AppConstants.OVERLAY_CARD_BORDER);
-                    g2.drawRoundRect(boxX, boxY, boxW, boxH, 8, 8);
-
-                    int connectorY = boxY + boxH / 2;
-                    g2.setColor(new Color(210, 210, 220, 170));
-                    g2.drawLine(boxX + boxW, connectorY, drawX - 3, yOnRoute);
-
-                    int iconListX = boxX + 4;
-                    int iconListY = boxY + 6;
-                    if (icon != null) {
-                        icon.paintIcon(this, g2, iconListX, iconListY);
-                    } else {
-                        g2.setColor(marker.getVehicleType() == VehicleType.TRAM
-                                ? new Color(255, 140, 0)
-                                : new Color(76, 175, 80));
-                        g2.fillOval(iconListX, iconListY, 12, 12);
-                    }
-
-                    g2.setFont(titleFont);
-                    g2.setColor(new Color(190, 190, 210));
-                    g2.drawString(title, boxX + 18, boxY + 10);
-
-                    g2.setFont(detailsFont);
-                    g2.setColor(AppConstants.TEXT_PRIMARY);
-                    g2.drawString(details, boxX + 18, boxY + 20);
-                }
-            }
-
-            g2.dispose();
+        @Override
+        public boolean getScrollableTracksViewportHeight() {
+            return false;
         }
     }
+
 }
 

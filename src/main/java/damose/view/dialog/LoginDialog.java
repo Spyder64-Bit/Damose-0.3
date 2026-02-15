@@ -7,7 +7,6 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Image;
 import java.awt.Point;
 import java.awt.RenderingHints;
 import java.awt.event.KeyAdapter;
@@ -18,15 +17,11 @@ import java.awt.event.MouseMotionAdapter;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.geom.RoundRectangle2D;
-import java.awt.image.BufferedImage;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.function.Consumer;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -46,18 +41,24 @@ public class LoginDialog extends JFrame {
 
     private static final String SWITCH_TO_REGISTER_TEXT = "Non hai ancora un account? Registrati";
     private static final String SWITCH_TO_LOGIN_TEXT = "Hai gi\u00E0 un account? Accedi";
+    private static final int LOGIN_HEIGHT = 540;
+    private static final int REGISTER_HEIGHT = 680;
+    private static final int DIALOG_WIDTH = 450;
     private static final int TITLE_ICON_SIZE = 56;
 
     private JTextField usernameField;
     private JPasswordField passwordField;
     private JPasswordField confirmPasswordField;
     private JTextField emailField;
-    private JLabel confirmLabel, emailLabel, messageLabel, subtitleLabel;
-    private JButton actionButton, switchModeButton;
-    private JPanel mainPanel;
+    private JLabel confirmLabel;
+    private JLabel emailLabel;
+    private JLabel messageLabel;
+    private JLabel subtitleLabel;
+    private JButton actionButton;
+    private JButton switchModeButton;
 
     private boolean isLoginMode = true;
-    private User loggedInUser = null;
+    private User loggedInUser;
     private boolean wasCancelled = true;
 
     private Consumer<User> onComplete;
@@ -69,27 +70,10 @@ public class LoginDialog extends JFrame {
         setBackground(new Color(0, 0, 0, 0));
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 
-        try {
-            Image trimmedIcon = loadTrimmedImage("/sprites/icon.png");
-            if (trimmedIcon != null) {
-                List<Image> icons = new ArrayList<>();
-                icons.add(trimmedIcon.getScaledInstance(256, 256, Image.SCALE_SMOOTH));
-                icons.add(trimmedIcon.getScaledInstance(128, 128, Image.SCALE_SMOOTH));
-                icons.add(trimmedIcon.getScaledInstance(64, 64, Image.SCALE_SMOOTH));
-                icons.add(trimmedIcon.getScaledInstance(48, 48, Image.SCALE_SMOOTH));
-                icons.add(trimmedIcon.getScaledInstance(32, 32, Image.SCALE_SMOOTH));
-                icons.add(trimmedIcon.getScaledInstance(16, 16, Image.SCALE_SMOOTH));
-                setIconImages(icons);
-            }
-        } catch (Exception e) {
-            System.out.println("Could not load app icon: " + e.getMessage());
-        }
+        DialogIconSupport.applyAppIcons(this, getClass());
 
         addWindowListener(new WindowAdapter() {
             @Override
-            /**
-             * Handles windowClosing.
-             */
             public void windowClosing(WindowEvent e) {
                 wasCancelled = true;
                 dispose();
@@ -100,10 +84,10 @@ public class LoginDialog extends JFrame {
         });
 
         initComponents();
-        setSize(450, 540);
+        setSize(DIALOG_WIDTH, LOGIN_HEIGHT);
         setLocationRelativeTo(parent);
         setResizable(false);
-        setShape(new RoundRectangle2D.Double(0, 0, 450, 540, 16, 16));
+        setShape(new RoundRectangle2D.Double(0, 0, DIALOG_WIDTH, LOGIN_HEIGHT, 16, 16));
     }
 
     /**
@@ -114,8 +98,8 @@ public class LoginDialog extends JFrame {
     }
 
     private void closeWithResult(User user, boolean cancelled) {
-        this.loggedInUser = user;
-        this.wasCancelled = cancelled;
+        loggedInUser = user;
+        wasCancelled = cancelled;
         dispose();
         if (onComplete != null) {
             onComplete.accept(user);
@@ -123,7 +107,19 @@ public class LoginDialog extends JFrame {
     }
 
     private void initComponents() {
-        mainPanel = new JPanel(new BorderLayout()) {
+        JPanel mainPanel = createMainPanel();
+        JPanel titleBar = createTitleBar();
+        JPanel contentPanel = buildContentPanel();
+
+        mainPanel.add(titleBar, BorderLayout.NORTH);
+        mainPanel.add(contentPanel, BorderLayout.CENTER);
+        setContentPane(mainPanel);
+
+        bindEnterAndEscape();
+    }
+
+    private JPanel createMainPanel() {
+        JPanel mainPanel = new JPanel(new BorderLayout()) {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -137,9 +133,10 @@ public class LoginDialog extends JFrame {
         };
         mainPanel.setOpaque(false);
         mainPanel.setBorder(new EmptyBorder(0, 0, 0, 0));
+        return mainPanel;
+    }
 
-        JPanel titleBar = createTitleBar();
-
+    private JPanel buildContentPanel() {
         JPanel contentPanel = new JPanel();
         contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
         contentPanel.setOpaque(false);
@@ -150,18 +147,10 @@ public class LoginDialog extends JFrame {
         titleRow.setLayout(new BoxLayout(titleRow, BoxLayout.X_AXIS));
         titleRow.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        try {
-            Image trimmedIcon = loadTrimmedImage("/sprites/icon.png");
-            Image scaled = trimmedIcon != null
-                    ? trimmedIcon.getScaledInstance(TITLE_ICON_SIZE, TITLE_ICON_SIZE, Image.SCALE_SMOOTH)
-                    : null;
-            JLabel iconLabel = new JLabel(new ImageIcon(scaled));
-            iconLabel.setPreferredSize(new Dimension(TITLE_ICON_SIZE, TITLE_ICON_SIZE));
-            iconLabel.setMaximumSize(new Dimension(TITLE_ICON_SIZE, TITLE_ICON_SIZE));
-            iconLabel.setAlignmentY(Component.CENTER_ALIGNMENT);
+        JLabel iconLabel = DialogIconSupport.createTitleIconLabel(getClass(), TITLE_ICON_SIZE);
+        if (iconLabel != null) {
             titleRow.add(iconLabel);
             titleRow.add(Box.createHorizontalStrut(12));
-        } catch (Exception e) {
         }
 
         JLabel titleLabel = new JLabel("Damose");
@@ -180,20 +169,20 @@ public class LoginDialog extends JFrame {
         contentPanel.add(subtitleLabel);
         contentPanel.add(Box.createVerticalStrut(18));
 
-        contentPanel.add(createLabel("Username"));
+        contentPanel.add(DialogComponentFactory.createFieldLabel("Username"));
         contentPanel.add(Box.createVerticalStrut(6));
-        usernameField = createTextField();
+        usernameField = DialogComponentFactory.createRoundedTextField();
         contentPanel.add(usernameField);
         contentPanel.add(Box.createVerticalStrut(16));
 
-        contentPanel.add(createLabel("Password"));
+        contentPanel.add(DialogComponentFactory.createFieldLabel("Password"));
         contentPanel.add(Box.createVerticalStrut(6));
-        passwordField = createPasswordField();
+        passwordField = DialogComponentFactory.createRoundedPasswordField();
         contentPanel.add(passwordField);
         contentPanel.add(Box.createVerticalStrut(16));
 
-        confirmLabel = createLabel("Conferma Password");
-        confirmPasswordField = createPasswordField();
+        confirmLabel = DialogComponentFactory.createFieldLabel("Conferma Password");
+        confirmPasswordField = DialogComponentFactory.createRoundedPasswordField();
         confirmLabel.setVisible(false);
         confirmPasswordField.setVisible(false);
         contentPanel.add(confirmLabel);
@@ -201,8 +190,8 @@ public class LoginDialog extends JFrame {
         contentPanel.add(confirmPasswordField);
         contentPanel.add(Box.createVerticalStrut(16));
 
-        emailLabel = createLabel("Email (opzionale)");
-        emailField = createTextField();
+        emailLabel = DialogComponentFactory.createFieldLabel("Email (opzionale)");
+        emailField = DialogComponentFactory.createRoundedTextField();
         emailLabel.setVisible(false);
         emailField.setVisible(false);
         contentPanel.add(emailLabel);
@@ -217,34 +206,21 @@ public class LoginDialog extends JFrame {
         contentPanel.add(messageLabel);
         contentPanel.add(Box.createVerticalStrut(16));
 
-        actionButton = createPrimaryButton("Accedi");
+        actionButton = DialogComponentFactory.createPrimaryButton("Accedi");
         actionButton.addActionListener(e -> performAction());
         contentPanel.add(actionButton);
         contentPanel.add(Box.createVerticalStrut(12));
 
-        switchModeButton = createLinkButton(SWITCH_TO_REGISTER_TEXT);
+        switchModeButton = DialogComponentFactory.createLinkButton(SWITCH_TO_REGISTER_TEXT);
         switchModeButton.addActionListener(e -> toggleMode());
         contentPanel.add(switchModeButton);
         contentPanel.add(Box.createVerticalStrut(8));
 
-        JButton skipButton = createLinkButton("Continua senza account");
+        JButton skipButton = DialogComponentFactory.createLinkButton("Continua senza account");
         skipButton.addActionListener(e -> closeWithResult(null, false));
         contentPanel.add(skipButton);
 
-        mainPanel.add(titleBar, BorderLayout.NORTH);
-        mainPanel.add(contentPanel, BorderLayout.CENTER);
-        setContentPane(mainPanel);
-
-        KeyAdapter enterKey = new KeyAdapter() {
-            public void keyPressed(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_ENTER) performAction();
-                if (e.getKeyCode() == KeyEvent.VK_ESCAPE) closeWithResult(null, true);
-            }
-        };
-        usernameField.addKeyListener(enterKey);
-        passwordField.addKeyListener(enterKey);
-        confirmPasswordField.addKeyListener(enterKey);
-        emailField.addKeyListener(enterKey);
+        return contentPanel;
     }
 
     private JPanel createTitleBar() {
@@ -258,6 +234,7 @@ public class LoginDialog extends JFrame {
                 dragOffset = e.getPoint();
             }
         });
+
         titleBar.addMouseMotionListener(new MouseMotionAdapter() {
             public void mouseDragged(MouseEvent e) {
                 Point loc = getLocation();
@@ -272,16 +249,14 @@ public class LoginDialog extends JFrame {
         closeBtn.setVerticalAlignment(JLabel.CENTER);
         closeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         closeBtn.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) { closeWithResult(null, true); }
-            /**
-             * Handles mouseEntered.
-             */
+            public void mouseClicked(MouseEvent e) {
+                closeWithResult(null, true);
+            }
+
             public void mouseEntered(MouseEvent e) {
                 closeBtn.setText("<html><b style='font-size:14px;color:#ff6b6b'>X</b></html>");
             }
-            /**
-             * Handles mouseExited.
-             */
+
             public void mouseExited(MouseEvent e) {
                 closeBtn.setText("<html><b style='font-size:14px'>X</b></html>");
             }
@@ -291,162 +266,31 @@ public class LoginDialog extends JFrame {
         return titleBar;
     }
 
-    private Image loadTrimmedImage(String path) {
-        java.net.URL url = getClass().getResource(path);
-        if (url == null) {
-            return null;
-        }
-        ImageIcon rawIcon = new ImageIcon(url);
-        if (rawIcon.getIconWidth() <= 0 || rawIcon.getIconHeight() <= 0) {
-            return null;
-        }
-
-        BufferedImage source = new BufferedImage(rawIcon.getIconWidth(), rawIcon.getIconHeight(), BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2 = source.createGraphics();
-        g2.drawImage(rawIcon.getImage(), 0, 0, null);
-        g2.dispose();
-
-        return trimTransparentBorders(source);
-    }
-
-    private BufferedImage trimTransparentBorders(BufferedImage source) {
-        int w = source.getWidth();
-        int h = source.getHeight();
-        int minX = w;
-        int minY = h;
-        int maxX = -1;
-        int maxY = -1;
-
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                int alpha = (source.getRGB(x, y) >>> 24) & 0xFF;
-                if (alpha > 8) {
-                    if (x < minX) minX = x;
-                    if (y < minY) minY = y;
-                    if (x > maxX) maxX = x;
-                    if (y > maxY) maxY = y;
+    private void bindEnterAndEscape() {
+        KeyAdapter enterKey = new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    performAction();
+                }
+                if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                    closeWithResult(null, true);
                 }
             }
-        }
-
-        if (maxX < minX || maxY < minY) {
-            return source;
-        }
-        return source.getSubimage(minX, minY, maxX - minX + 1, maxY - minY + 1);
-    }
-
-    private JLabel createLabel(String text) {
-        JLabel label = new JLabel(text);
-        label.setForeground(AppConstants.TEXT_SECONDARY);
-        label.setFont(AppConstants.FONT_SMALL);
-        label.setAlignmentX(Component.CENTER_ALIGNMENT);
-        return label;
-    }
-
-    private JTextField createTextField() {
-        JTextField field = new JTextField() {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(getBackground());
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
-                super.paintComponent(g);
-                g2.dispose();
-            }
         };
-        field.setOpaque(false);
-        field.setBackground(AppConstants.BG_LIGHT);
-        field.setForeground(AppConstants.TEXT_PRIMARY);
-        field.setCaretColor(AppConstants.TEXT_PRIMARY);
-        field.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(AppConstants.BORDER_COLOR, 1, true),
-            new EmptyBorder(10, 14, 10, 14)));
-        field.setFont(AppConstants.FONT_BODY);
-        field.setMaximumSize(new Dimension(320, 42));
-        field.setPreferredSize(new Dimension(320, 42));
-        field.setAlignmentX(Component.CENTER_ALIGNMENT);
-        return field;
-    }
 
-    private JPasswordField createPasswordField() {
-        JPasswordField field = new JPasswordField() {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(getBackground());
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
-                super.paintComponent(g);
-                g2.dispose();
-            }
-        };
-        field.setOpaque(false);
-        field.setBackground(AppConstants.BG_LIGHT);
-        field.setForeground(AppConstants.TEXT_PRIMARY);
-        field.setCaretColor(AppConstants.TEXT_PRIMARY);
-        field.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(AppConstants.BORDER_COLOR, 1, true),
-            new EmptyBorder(10, 14, 10, 14)));
-        field.setFont(AppConstants.FONT_BODY);
-        field.setMaximumSize(new Dimension(320, 42));
-        field.setPreferredSize(new Dimension(320, 42));
-        field.setAlignmentX(Component.CENTER_ALIGNMENT);
-        return field;
-    }
-
-    private JButton createPrimaryButton(String text) {
-        JButton btn = new JButton(text) {
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(getBackground());
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        };
-        btn.setBackground(AppConstants.ACCENT);
-        btn.setForeground(Color.WHITE);
-        btn.setFont(AppConstants.FONT_BUTTON);
-        btn.setBorderPainted(false);
-        btn.setFocusPainted(false);
-        btn.setContentAreaFilled(false);
-        btn.setOpaque(false);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setMaximumSize(new Dimension(320, 44));
-        btn.setPreferredSize(new Dimension(320, 44));
-        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        btn.addMouseListener(new MouseAdapter() {
-            public void mouseEntered(MouseEvent e) { btn.setBackground(AppConstants.ACCENT_HOVER); btn.repaint(); }
-            public void mouseExited(MouseEvent e) { btn.setBackground(AppConstants.ACCENT); btn.repaint(); }
-        });
-
-        return btn;
-    }
-
-    private JButton createLinkButton(String text) {
-        JButton btn = new JButton(text);
-        btn.setForeground(AppConstants.TEXT_SECONDARY);
-        btn.setFont(AppConstants.FONT_SMALL);
-        btn.setBorderPainted(false);
-        btn.setContentAreaFilled(false);
-        btn.setFocusPainted(false);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        btn.addMouseListener(new MouseAdapter() {
-            public void mouseEntered(MouseEvent e) { btn.setForeground(AppConstants.ACCENT); }
-            public void mouseExited(MouseEvent e) { btn.setForeground(AppConstants.TEXT_SECONDARY); }
-        });
-
-        return btn;
+        usernameField.addKeyListener(enterKey);
+        passwordField.addKeyListener(enterKey);
+        confirmPasswordField.addKeyListener(enterKey);
+        emailField.addKeyListener(enterKey);
     }
 
     private void toggleMode() {
         isLoginMode = !isLoginMode;
+        updateModeUi();
+    }
+
+    private void updateModeUi() {
         confirmLabel.setVisible(!isLoginMode);
         confirmPasswordField.setVisible(!isLoginMode);
         emailLabel.setVisible(!isLoginMode);
@@ -456,41 +300,67 @@ public class LoginDialog extends JFrame {
         subtitleLabel.setText(isLoginMode ? "Accedi al tuo account" : "Crea un nuovo account");
         messageLabel.setText(" ");
 
-        int newHeight = isLoginMode ? 540 : 680;
-        int newWidth = 450;
-        setSize(newWidth, newHeight);
-        setShape(new RoundRectangle2D.Double(0, 0, newWidth, newHeight, 16, 16));
+        int newHeight = isLoginMode ? LOGIN_HEIGHT : REGISTER_HEIGHT;
+        setSize(DIALOG_WIDTH, newHeight);
+        setShape(new RoundRectangle2D.Double(0, 0, DIALOG_WIDTH, newHeight, 16, 16));
     }
 
     private void performAction() {
         String username = usernameField.getText().trim();
         String password = new String(passwordField.getPassword());
 
-        if (username.isEmpty() || password.isEmpty()) {
-            showError("Compila tutti i campi");
+        String validationError = validateCredentials(username, password);
+        if (validationError != null) {
+            showError(validationError);
             return;
         }
-        if (username.length() < 3) { showError("Username min 3 caratteri"); return; }
-        if (password.length() < 4) { showError("Password min 4 caratteri"); return; }
 
         if (isLoginMode) {
-            User user = UserService.login(username, password);
-            if (user != null) {
-                closeWithResult(user, false);
-            } else {
-                showError("Credenziali non valide");
-            }
+            handleLogin(username, password);
         } else {
-            String confirm = new String(confirmPasswordField.getPassword());
-            if (!password.equals(confirm)) { showError("Le password non coincidono"); return; }
-            String email = emailField.getText().trim();
-            if (UserService.register(username, password, email.isEmpty() ? null : email)) {
-                showSuccess("Registrazione completata!");
-                toggleMode();
-                usernameField.setText(username);
-            } else {
-                showError("Username gi\u00E0 in uso");
-            }
+            handleRegistration(username, password);
+        }
+    }
+
+    private String validateCredentials(String username, String password) {
+        if (username.isEmpty() || password.isEmpty()) {
+            return "Compila tutti i campi";
+        }
+        if (username.length() < 3) {
+            return "Username min 3 caratteri";
+        }
+        if (password.length() < 4) {
+            return "Password min 4 caratteri";
+        }
+        return null;
+    }
+
+    private void handleLogin(String username, String password) {
+        User user = UserService.login(username, password);
+        if (user != null) {
+            closeWithResult(user, false);
+        } else {
+            showError("Credenziali non valide");
+        }
+    }
+
+    private void handleRegistration(String username, String password) {
+        String confirm = new String(confirmPasswordField.getPassword());
+        if (!password.equals(confirm)) {
+            showError("Le password non coincidono");
+            return;
+        }
+
+        String email = emailField.getText().trim();
+        boolean registered = UserService.register(username, password, email.isEmpty() ? null : email);
+        if (registered) {
+            showSuccess("Registrazione completata!");
+            toggleMode();
+            usernameField.setText(username);
+            passwordField.setText("");
+            confirmPasswordField.setText("");
+        } else {
+            showError("Username gi\u00E0 in uso");
         }
     }
 
@@ -518,4 +388,3 @@ public class LoginDialog extends JFrame {
         return loggedInUser;
     }
 }
-

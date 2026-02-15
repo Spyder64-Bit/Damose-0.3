@@ -24,6 +24,7 @@ public final class AppConstants {
 
     public static final int RT_TIMEOUT_SECONDS = 30;
     public static final int RT_UPDATE_INTERVAL_MS = 30_000;
+    public static final int RT_STALE_THRESHOLD_SECONDS = 95;
     public static final int HTTP_CONNECT_TIMEOUT_MS = 30_000;
     public static final int HTTP_READ_TIMEOUT_MS = 60_000;
 
@@ -68,6 +69,8 @@ public final class AppConstants {
     public static final int FLOATING_PANEL_WIDTH = 360;
     public static final int FLOATING_ROW_HEIGHT = 32;
     public static final int FLOATING_HEADER_HEIGHT = 50;
+    public static final int ROME_OVERVIEW_ZOOM = 8;
+    public static final int MAX_ANIMATION_PULLBACK_ZOOM = 10;
 
     public static final double ROME_LAT = 41.9028;
     public static final double ROME_LON = 12.4964;

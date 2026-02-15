@@ -20,8 +20,8 @@ public final class FavoritesService {
 
     private static final Set<String> favoriteStopIds = new HashSet<>();
     private static final Set<String> favoriteLineIds = new HashSet<>();
-    private static List<Stop> allStopsCache = new ArrayList<>();
-    private static List<Stop> allLinesCache = new ArrayList<>();
+    private static List<Stop> allStopsCache = List.of();
+    private static List<Stop> allLinesCache = List.of();
     private static Runnable onFavoritesChanged;
 
     private FavoritesService() {
@@ -31,15 +31,15 @@ public final class FavoritesService {
      * Returns the result of init.
      */
     public static void init(List<Stop> allStops) {
-        init(allStops, new ArrayList<>());
+        init(allStops, List.of());
     }
 
     /**
      * Returns the result of init.
      */
     public static void init(List<Stop> allStops, List<Stop> allLines) {
-        allStopsCache = new ArrayList<>(allStops);
-        allLinesCache = new ArrayList<>(allLines);
+        allStopsCache = allStops != null ? allStops : List.of();
+        allLinesCache = allLines != null ? allLines : List.of();
         loadFavorites();
         loadLineFavorites();
     }

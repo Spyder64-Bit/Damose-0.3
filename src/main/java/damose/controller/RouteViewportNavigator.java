@@ -36,6 +36,22 @@ public final class RouteViewportNavigator {
     }
 
     /**
+     * Handles focusOnVehicle.
+     */
+    public void focusOnVehicle(JXMapViewer mapViewer, GeoPosition vehiclePos, boolean animate) {
+        if (mapViewer == null || vehiclePos == null) return;
+
+        int zoom = mapViewer.getZoom();
+        GeoPosition targetCenter = computeBottomThirdCenter(mapViewer, vehiclePos, zoom);
+        if (animate) {
+            MapAnimator.panTo(mapViewer, targetCenter, 850);
+        } else {
+            mapViewer.setCenterPosition(targetCenter);
+            mapViewer.repaint();
+        }
+    }
+
+    /**
      * Handles fitMapToRoute.
      */
     public void fitMapToRoute(JXMapViewer mapViewer, List<Stop> routeStops, boolean hasRoutePanel) {
